@@ -4,6 +4,7 @@ import {
   getAllRooms,
   getRoomById,
   updateRoom,
+  deleteRoom,
   assignStudentToRoom,
   removeStudentFromRoom,
 } from "../Controllers/RoomController.js"
@@ -11,16 +12,17 @@ import { protect, authorize } from "../Middleware/auth.js"
 
 const router = express.Router()
 
-// Protect all routes
+router.get("/", getAllRooms)
+router.get("/:id", getRoomById)
+router.delete("/:id", deleteRoom);
+
+
+// Protect all routes (user must be authenticated)
 router.use(protect)
 
-// Admin-only routes
-router.post("/", authorize("admin"), createRoom)
-router.put("/:id", authorize("admin"), updateRoom)
-
-// Admin and warden routes
-router.get("/", authorize("admin", "warden"), getAllRooms)
-router.get("/:id", authorize("admin", "warden"), getRoomById)
+// Routes accessible by both admin and warden
+router.post("/", authorize("admin", "warden"), createRoom)
+router.put("/:id", authorize("admin", "warden"), updateRoom)
 router.post("/:id/assign", authorize("admin", "warden"), assignStudentToRoom)
 router.post("/:id/remove", authorize("admin", "warden"), removeStudentFromRoom)
 

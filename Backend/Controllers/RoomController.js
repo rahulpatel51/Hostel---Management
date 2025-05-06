@@ -1,51 +1,62 @@
-import Room from "../Models/Room.js"
-import Student from "../Models/Student.js"
+import Room from "../Models/Room.js";
+import Student from "../Models/Student.js";
 
-// Create room
+// Create Room
 export const createRoom = async (req, res, next) => {
   try {
-    const { roomNumber, block, floor, capacity, roomType, facilities } = req.body
-
-    // Check if room already exists
-    const existingRoom = await Room.findOne({ roomNumber })
-    if (existingRoom) {
-      return res.status(400).json({
-        success: false,
-        message: "Room with this number already exists",
-      })
-    }
-
-    // Create room
-    const room = await Room.create({
-      roomNumber,
+    const {
       block,
       floor,
       capacity,
       roomType,
       facilities,
-      status: "available",
-    })
+      description,
+      price,
+      pricePeriod,
+      roomNumber,
+      imageUrl, // Now coming from Cloudinary upload
+    } = req.body;
 
-    res.status(201).json({
-      success: true,
-      data: room,
-    })
+    // Check if room already exists
+    const existingRoom = await Room.findOne({ block, roomNumber });
+    if (existingRoom) {
+      return res.status(400).json({
+        success: false,
+        message: `Room ${roomNumber} already exists in Block ${block}.`,
+      });
+    }
+
+    const newRoom = new Room({
+      block,
+      floor,
+      capacity,
+      roomType,
+      facilities,
+      description,
+      price,
+      pricePeriod,
+      imageUrl,
+      roomNumber,
+      occupiedCount: 0,
+    });
+
+    const savedRoom = await newRoom.save();
+    res.status(201).json({ success: true, data: savedRoom });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-// Get all rooms
+// Get All Rooms
 export const getAllRooms = async (req, res, next) => {
   try {
-    // Filter by query params
-    const { block, floor, status, roomType } = req.query
-    const query = {}
+    const { block, floor, status, roomType } = req.query;
+    const query = {};
 
-    if (block) query.block = block
-    if (floor) query.floor = Number.parseInt(floor)
-    if (status) query.status = status
-    if (roomType) query.roomType = roomType
+    if (block) query.block = block;
+    if (floor) query.floor = floor;
+    if (status) query.status = status;
+    if (roomType) query.roomType = roomType;
 
     const rooms = await Room.find(query).populate({
       path: "occupants",
@@ -54,19 +65,15 @@ export const getAllRooms = async (req, res, next) => {
         path: "userId",
         select: "username profilePicture",
       },
-    })
+    });
 
-    res.status(200).json({
-      success: true,
-      count: rooms.length,
-      data: rooms,
-    })
+    res.status(200).json({ success: true, count: rooms.length, data: rooms });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-// Get room by ID
+// Get Room by ID
 export const getRoomById = async (req, res, next) => {
   try {
     const room = await Room.findById(req.params.id).populate({
@@ -76,178 +83,140 @@ export const getRoomById = async (req, res, next) => {
         path: "userId",
         select: "username profilePicture",
       },
-    })
+    });
 
     if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      })
+      return res.status(404).json({ success: false, message: "Room not found." });
     }
 
-    res.status(200).json({
-      success: true,
-      data: room,
-    })
+    res.status(200).json({ success: true, data: room });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-// Update room
+// Update Room
 export const updateRoom = async (req, res, next) => {
   try {
-    const { roomNumber, block, floor, capacity, roomType, facilities, status } = req.body
+    const updateFields = { ...req.body };
 
-    // Find room
-    const room = await Room.findById(req.params.id)
-
+    const room = await Room.findById(req.params.id);
     if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      })
+      return res.status(404).json({ success: false, message: "Room not found." });
     }
 
-    // Check if new capacity is less than current occupants
-    if (capacity && capacity < room.occupiedCount) {
+    if (
+      updateFields.capacity &&
+      Number(updateFields.capacity) < room.occupiedCount
+    ) {
       return res.status(400).json({
         success: false,
-        message: "New capacity cannot be less than current occupants count",
-      })
+        message: `New capacity (${updateFields.capacity}) cannot be less than current occupancy (${room.occupiedCount}).`,
+      });
     }
 
-    // Update room
-    const updatedRoom = await Room.findByIdAndUpdate(
-      req.params.id,
-      {
-        roomNumber,
-        block,
-        floor,
-        capacity,
-        roomType,
-        facilities,
-        status,
-      },
-      { new: true, runValidators: true },
-    )
+    const updatedRoom = await Room.findByIdAndUpdate(req.params.id, updateFields, {
+      new: true,
+      runValidators: true,
+    });
 
-    res.status(200).json({
-      success: true,
-      data: updatedRoom,
-    })
+    res.status(200).json({ success: true, data: updatedRoom });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-// Assign student to room
+// Delete Room
+export const deleteRoom = async (req, res, next) => {
+  try {
+    const room = await Room.findById(req.params.id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: "Room not found." });
+    }
+
+    // Remove room assignment from students
+    await Student.updateMany(
+      { roomId: room._id },
+      { $unset: { roomId: "" } }
+    );
+
+    // Optionally: handle Cloudinary image deletion here if desired (not implemented)
+    // You would need the `public_id` stored in DB for this.
+
+    await room.deleteOne();
+
+    res.status(200).json({ success: true, message: "Room deleted successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Assign Student to Room
 export const assignStudentToRoom = async (req, res, next) => {
   try {
-    const { studentId } = req.body
+    const { studentId } = req.body;
 
-    // Find room
-    const room = await Room.findById(req.params.id)
+    const [room, student] = await Promise.all([
+      Room.findById(req.params.id),
+      Student.findById(studentId),
+    ]);
 
-    if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      })
-    }
+    if (!room) return res.status(404).json({ success: false, message: "Room not found." });
+    if (!student) return res.status(404).json({ success: false, message: "Student not found." });
 
-    // Check if room is full
     if (room.occupiedCount >= room.capacity) {
-      return res.status(400).json({
-        success: false,
-        message: "Room is already at full capacity",
-      })
+      return res.status(400).json({ success: false, message: "Room is full." });
     }
 
-    // Find student
-    const student = await Student.findById(studentId)
-
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      })
-    }
-
-    // Check if student is already assigned to a room
-    if (student.roomId) {
-      // Remove student from previous room
+    // Remove student from previous room if needed
+    if (student.roomId && student.roomId.toString() !== room._id.toString()) {
       await Room.findByIdAndUpdate(student.roomId, {
         $inc: { occupiedCount: -1 },
         $pull: { occupants: student._id },
-      })
+      });
     }
 
-    // Assign student to room
-    room.occupants.push(student._id)
-    room.occupiedCount += 1
-    await room.save()
+    // Assign to new room
+    room.occupants.push(student._id);
+    room.occupiedCount += 1;
+    await room.save();
 
-    // Update student's room
-    student.roomId = room._id
-    await student.save()
+    student.roomId = room._id;
+    await student.save();
 
-    res.status(200).json({
-      success: true,
-      data: room,
-    })
+    res.status(200).json({ success: true, message: "Student assigned successfully.", data: room });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-// Remove student from room
+// Remove Student from Room
 export const removeStudentFromRoom = async (req, res, next) => {
   try {
-    const { studentId } = req.body
+    const { studentId } = req.body;
 
-    // Find room
-    const room = await Room.findById(req.params.id)
+    const [room, student] = await Promise.all([
+      Room.findById(req.params.id),
+      Student.findById(studentId),
+    ]);
 
-    if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: "Room not found",
-      })
+    if (!room || !student) {
+      return res.status(404).json({ success: false, message: "Room or Student not found." });
     }
 
-    // Find student
-    const student = await Student.findById(studentId)
-
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      })
+    if (!student.roomId || student.roomId.toString() !== room._id.toString()) {
+      return res.status(400).json({ success: false, message: "Student is not assigned to this room." });
     }
 
-    // Check if student is assigned to this room
-    if (!student.roomId || student.roomId.toString() !== req.params.id) {
-      return res.status(400).json({
-        success: false,
-        message: "Student is not assigned to this room",
-      })
-    }
+    room.occupants = room.occupants.filter(id => id.toString() !== studentId);
+    room.occupiedCount = Math.max(0, room.occupiedCount - 1);
+    await room.save();
 
-    // Remove student from room
-    room.occupants = room.occupants.filter((occupant) => occupant.toString() !== studentId)
-    room.occupiedCount -= 1
-    await room.save()
+    student.roomId = null;
+    await student.save();
 
-    // Update student's room
-    student.roomId = null
-    await student.save()
-
-    res.status(200).json({
-      success: true,
-      data: room,
-    })
+    res.status(200).json({ success: true, message: "Student removed from room.", data: room });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};

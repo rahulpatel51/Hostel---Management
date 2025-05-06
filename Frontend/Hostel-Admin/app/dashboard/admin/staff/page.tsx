@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +119,9 @@ export default function StaffManagementPage() {
       try {
         setIsLoading(true);
         const response = await api.get("/admin/wardens");
-        setWardens(response.data);
+        // Ensure the response data is an array
+        const data = Array.isArray(response.data) ? response.data : [];
+        setWardens(data);
         setError(null);
       } catch (err) {
         console.error("Error fetching wardens:", err);
@@ -147,14 +149,15 @@ export default function StaffManagementPage() {
                          warden.qualification.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = activeTab === "all" || 
-                      warden.status.toLowerCase() === activeTab.toLowerCase();
+                      (activeTab === "active" && warden.status === "Active") ||
+                      (activeTab === "inactive" && warden.status !== "Active");
     
     return matchesSearch && matchesTab;
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
       setImageFile(file);
     }
   };
@@ -163,18 +166,19 @@ export default function StaffManagementPage() {
     try {
       setIsLoading(true);
       
+      // Create form data for file upload
       const formData = new FormData();
       formData.append("name", newWarden.name);
       formData.append("email", newWarden.email);
-      formData.append("password", newWarden.password);
       formData.append("employeeId", newWarden.employeeId);
       formData.append("contactNumber", newWarden.contactNumber);
       formData.append("qualification", newWarden.qualification);
-      formData.append("assignedBlocks", JSON.stringify(newWarden.assignedBlocks));
       formData.append("status", newWarden.status);
       formData.append("joinDate", newWarden.joinDate);
       formData.append("address", newWarden.address);
       formData.append("aadhaar", newWarden.aadhaar);
+      formData.append("password", newWarden.password);
+      
       if (imageFile) {
         formData.append("image", imageFile);
       }
@@ -186,19 +190,34 @@ export default function StaffManagementPage() {
       });
 
       setWardens([...wardens, response.data]);
-      setIsAddStaffOpen(false);
-      resetNewWardenForm();
       
       toast({
         title: "Success",
-        description: "Warden added successfully",
+        description: `Warden ${newWarden.name} added successfully`,
       });
-    } catch (err) {
-      console.error("Error adding warden:", err);
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.message || "Failed to add warden"
-        : "Failed to add warden";
-      
+
+      // Reset form
+      setNewWarden({
+        name: "",
+        email: "",
+        employeeId: "",
+        contactNumber: "",
+        qualification: "",
+        assignedBlocks: [],
+        status: "Active",
+        joinDate: new Date().toISOString().split('T')[0],
+        address: "",
+        aadhaar: "",
+        password: ""
+      });
+      setImageFile(null);
+      setIsAddStaffOpen(false);
+    } catch (error) {
+      console.error("Error adding warden:", error);
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || "Failed to add warden"
+        : "An unexpected error occurred";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -207,23 +226,6 @@ export default function StaffManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const resetNewWardenForm = () => {
-    setNewWarden({
-      name: "",
-      email: "",
-      employeeId: "",
-      contactNumber: "",
-      qualification: "",
-      assignedBlocks: [],
-      status: "Active",
-      joinDate: new Date().toISOString().split('T')[0],
-      address: "",
-      aadhaar: "",
-      password: ""
-    });
-    setImageFile(null);
   };
 
   const handleViewProfile = (warden: Warden) => {
@@ -236,28 +238,46 @@ export default function StaffManagementPage() {
     setIsEditProfileOpen(true);
   };
 
-  const handleSaveProfile = async () => {
+  const handleUpdateProfile = async () => {
     if (!editedWarden) return;
-    
+
     try {
       setIsLoading(true);
-      const response = await api.put(`/admin/wardens/${editedWarden._id}`, editedWarden);
       
-      setWardens(wardens.map(w => 
-        w._id === editedWarden._id ? response.data : w
-      ));
-      setIsEditProfileOpen(false);
+      const formData = new FormData();
+      formData.append("name", editedWarden.name);
+      formData.append("email", editedWarden.email);
+      formData.append("employeeId", editedWarden.employeeId);
+      formData.append("contactNumber", editedWarden.contactNumber);
+      formData.append("qualification", editedWarden.qualification);
+      formData.append("address", editedWarden.address);
+      formData.append("aadhaar", editedWarden.aadhaar);
+      
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      const response = await api.put(`/admin/wardens/${editedWarden._id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setWardens(wardens.map(w => w._id === editedWarden._id ? response.data : w));
       
       toast({
         title: "Success",
-        description: "Warden updated successfully",
+        description: `Warden ${editedWarden.name} updated successfully`,
       });
-    } catch (err) {
-      console.error("Error updating warden:", err);
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.message || "Failed to update warden"
-        : "Failed to update warden";
-      
+
+      setIsEditProfileOpen(false);
+      setImageFile(null);
+    } catch (error) {
+      console.error("Error updating warden:", error);
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || "Failed to update warden"
+        : "An unexpected error occurred";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -270,26 +290,26 @@ export default function StaffManagementPage() {
 
   const handleResetPassword = async () => {
     if (!selectedWarden || !newPassword) return;
-    
+
     try {
       setIsLoading(true);
-      await api.post(`/admin/wardens/${selectedWarden._id}/reset-password`, {
+      await api.patch(`/admin/wardens/${selectedWarden._id}/password`, {
         newPassword
       });
-      
-      setIsResetPassOpen(false);
-      setNewPassword("");
-      
+
       toast({
         title: "Success",
-        description: "Password reset successfully",
+        description: `Password reset for ${selectedWarden.name}`,
       });
-    } catch (err) {
-      console.error("Error resetting password:", err);
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.message || "Failed to reset password"
-        : "Failed to reset password";
-      
+
+      setIsResetPassOpen(false);
+      setNewPassword("");
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || "Failed to reset password"
+        : "An unexpected error occurred";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -302,28 +322,30 @@ export default function StaffManagementPage() {
 
   const handleStatusChange = async () => {
     if (!selectedWarden) return;
-    
+
     try {
       setIsLoading(true);
-      const response = await api.patch(`/admin/wardens/${selectedWarden._id}/status`, {
-        status: newStatus
-      });
-      
-      setWardens(wardens.map(w => 
-        w._id === selectedWarden._id ? response.data : w
-      ));
-      setIsStatusChangeOpen(false);
-      
+      const response = await api.patch(`/admin/wardens/${selectedWarden._id}/status`, { status: newStatus });
+      const updatedWarden = response.data;
+
+      setWardens((prevWardens) =>
+        prevWardens.map((warden) =>
+          warden._id === updatedWarden._id ? updatedWarden : warden
+        )
+      );
+
       toast({
         title: "Success",
-        description: `Status changed to ${newStatus}`,
+        description: `Status updated to ${newStatus} for ${selectedWarden.name}`,
       });
-    } catch (err) {
-      console.error("Error changing status:", err);
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.message || "Failed to change status"
-        : "Failed to change status";
-      
+
+      setIsStatusChangeOpen(false);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || "Failed to update status"
+        : "An unexpected error occurred";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -338,19 +360,19 @@ export default function StaffManagementPage() {
     try {
       setIsLoading(true);
       await api.delete(`/admin/wardens/${wardenId}`);
-      
+
       setWardens(wardens.filter(w => w._id !== wardenId));
       
       toast({
         title: "Success",
         description: "Warden deleted successfully",
       });
-    } catch (err) {
-      console.error("Error deleting warden:", err);
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.message || "Failed to delete warden"
-        : "Failed to delete warden";
-      
+    } catch (error) {
+      console.error("Error deleting warden:", error);
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || "Failed to delete warden"
+        : "An unexpected error occurred";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -519,7 +541,20 @@ export default function StaffManagementPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setIsAddStaffOpen(false);
-                resetNewWardenForm();
+                setNewWarden({
+                  name: "",
+                  email: "",
+                  employeeId: "",
+                  contactNumber: "",
+                  qualification: "",
+                  assignedBlocks: [],
+                  status: "Active",
+                  joinDate: new Date().toISOString().split('T')[0],
+                  address: "",
+                  aadhaar: "",
+                  password: ""
+                });
+                setImageFile(null);
               }}>
                 Cancel
               </Button>
@@ -866,15 +901,7 @@ export default function StaffManagementPage() {
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        const file = e.target.files[0];
-                        setEditedWarden({
-                          ...editedWarden,
-                          image: URL.createObjectURL(file)
-                        });
-                      }
-                    }}
+                    onChange={handleImageUpload}
                   />
                 </div>
               </div>
@@ -944,7 +971,7 @@ export default function StaffManagementPage() {
             <Button variant="outline" onClick={() => setIsEditProfileOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveProfile} disabled={isLoading}>
+            <Button onClick={handleUpdateProfile} disabled={isLoading}>
               {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
@@ -979,7 +1006,7 @@ export default function StaffManagementPage() {
             }}>
               Cancel
             </Button>
-            <Button onClick={handleResetPassword} disabled={isLoading}>
+            <Button onClick={handleResetPassword} disabled={isLoading || !newPassword}>
               {isLoading ? "Resetting..." : "Reset Password"}
             </Button>
           </DialogFooter>

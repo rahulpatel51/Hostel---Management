@@ -2,25 +2,25 @@ import mongoose from "mongoose";
 
 const roomSchema = new mongoose.Schema(
   {
-    roomId: {
-      type: String,
-      required: true,
-      unique: true,
-      match: /^[A-D]-\d{3}$/, // Pattern like A-101, B-205 etc.
-    },
     block: {
       type: String,
       required: true,
-      enum: ["A", "B", "C", "D"], // Changed to single letter to match your UI
+      enum: ["A", "B", "C", "D"], 
+    },
+    roomNumber: {
+      type: String,
+      match: /^[A-D]-\d{3}$/, // Matches room numbers like A-101, B-102, etc.
+    },
+    roomId: {
+      type: String,
+      unique: true,
     },
     floor: {
       type: String,
-      required: true,
-      enum: ["1st", "2nd", "3rd", "4th"], // Changed to match your UI format
+      enum: ["1st Floor", "2nd Floor", "3rd Floor", "4th Floor"],
     },
     capacity: {
       type: Number,
-      required: true,
       min: 1,
       max: 4,
       default: 2,
@@ -39,8 +39,8 @@ const roomSchema = new mongoose.Schema(
         "Non-AC Room - Boys",
         "Non-AC Room - Girls",
         "Deluxe Room - Boys",
-        "Deluxe Room - Girls"
-      ], // Updated to match your UI
+        "Deluxe Room - Girls",
+      ],
     },
     facilities: {
       type: [String],
@@ -52,8 +52,8 @@ const roomSchema = new mongoose.Schema(
         "Attached Bathroom",
         "Fan",
         "Geyser",
-        "Laundry Service"
-      ], // Added enum for validation
+        "Laundry Service",
+      ],
     },
     occupants: [
       {
@@ -63,7 +63,7 @@ const roomSchema = new mongoose.Schema(
     ],
     status: {
       type: String,
-      enum: ["Available", "Full", "Maintenance"], // Changed to match your UI
+      enum: ["Available", "Full", "Maintenance"],
       default: "Available",
     },
     description: {
@@ -72,7 +72,6 @@ const roomSchema = new mongoose.Schema(
     },
     price: {
       type: Number,
-      required: true,
       min: 0,
     },
     pricePeriod: {
@@ -82,17 +81,33 @@ const roomSchema = new mongoose.Schema(
     },
     imageUrl: {
       type: String,
-      required: true,
-      match: /^https?:\/\/.+/, // Simple URL validation
+      match: /^https?:\/\/.+/,
     },
     lastMaintenance: {
       type: Date,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-// Update room status based on occupancy
+// Auto-generate roomId before saving
+roomSchema.pre("validate", async function (next) {
+  if (!this.roomId && this.block && this.roomNumber) {
+    const existingRoom = await Room.findOne({
+      block: this.block,
+      roomNumber: this.roomNumber,
+    });
+
+    if (existingRoom) {
+      return next(new Error("Room number already exists in this block."));
+    }
+
+    this.roomId = `RM-${this.roomNumber}`; // Format like A-101, B-102, etc.
+  }
+  next();
+});
+
+// Automatically update room status
 roomSchema.pre("save", function (next) {
   if (this.status === "Maintenance") {
     this.occupiedCount = 0;
@@ -101,28 +116,9 @@ roomSchema.pre("save", function (next) {
   } else if (this.occupiedCount >= this.capacity) {
     this.status = "Full";
   } else {
-    this.status = "Available"; // Changed to match your UI which only has Available/Full/Maintenance
+    this.status = "Available";
   }
   next();
-});
-
-// Update block statistics when room changes
-roomSchema.post("save", async function (doc) {
-  const Block = mongoose.model("Block");
-  try {
-    const block = await Block.findOne({ name: `Block ${doc.block}` });
-    if (block) {
-      const rooms = await mongoose.model("Room").find({ block: doc.block });
-      
-      block.occupiedRooms = rooms.filter(r => r.status === "Full").length;
-      block.maintenanceRooms = rooms.filter(r => r.status === "Maintenance").length;
-      block.vacantRooms = block.totalRooms - block.occupiedRooms - block.maintenanceRooms;
-      
-      await block.save();
-    }
-  } catch (err) {
-    console.error("Error updating block statistics:", err);
-  }
 });
 
 const Room = mongoose.model("Room", roomSchema);

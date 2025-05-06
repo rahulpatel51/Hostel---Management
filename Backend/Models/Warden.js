@@ -64,6 +64,7 @@ const staffSchema = new mongoose.Schema(
     }
   },
   {
+    strictPopulate: false, // Optional, to allow populate if needed in the future
     timestamps: true,
     toJSON: {
       virtuals: true,
@@ -80,7 +81,7 @@ const staffSchema = new mongoose.Schema(
 staffSchema.pre("save", async function (next) {
   if (this.isModified("password")) {
     const salt = await bcrypt.genSalt(12);
-    this.password = bcrypt.hash(this.password, salt);
+    this.password = await bcrypt.hash(this.password, salt); // Await the hashing process
   }
 
   // Generate a staffId only if it's not already set
