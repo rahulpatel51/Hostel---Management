@@ -21,9 +21,7 @@ router.delete("/:id", deleteRoom);
 router.use(protect)
 
 // Routes accessible by both admin and warden
-router.post("/", authorize("admin", "warden"), createRoom)
-router.put("/:id", authorize("admin", "warden"), updateRoom)
-router.post("/:id/assign", authorize("admin", "warden"), assignStudentToRoom)
-router.post("/:id/remove", authorize("admin", "warden"), removeStudentFromRoom)
+router.post("/",  createRoom)
+router.put("/:id",  updateRoom)
 
 export default router

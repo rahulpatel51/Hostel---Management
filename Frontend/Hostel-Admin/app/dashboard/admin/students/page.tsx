@@ -78,7 +78,6 @@ export default function StudentManagementPage() {
 
   // Form State
   const [formData, setFormData] = useState({
-    studentId: "",
     name: "",
     email: "",
     phone: "",
@@ -108,28 +107,34 @@ export default function StudentManagementPage() {
       if (error.response?.status === 401) {
         localStorage.removeItem('token')
         router.push('/login')
-        toast({
-          title: "Session expired",
-          description: "Please login again",
-          variant: "destructive",
-        })
+        showToast("Session expired", "Please login again", "destructive")
       }
       return Promise.reject(error)
     }
   )
 
+  // Helper function for showing toast messages
+  const showToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
+    toast({
+      title,
+      description,
+      variant,
+    })
+  }
+
   // Fetch students
   useEffect(() => {
     const fetchStudents = async () => {
       try {
+        setIsLoading(true)
         const response = await api.get('/')
         setStudents(response.data.data)
-      } catch (error) {
-        toast({
-          title: "Error fetching students",
-          description: "Failed to load student data",
-          variant: "destructive",
-        })
+      } catch (error: any) {
+        showToast(
+          "Error fetching students", 
+          error.response?.data?.message || "Failed to load student data", 
+          "destructive"
+        )
       } finally {
         setIsLoading(false)
       }
@@ -181,7 +186,11 @@ export default function StudentManagementPage() {
           setFaceImage(imageSrc)
           setIsCapturing(false)
           stopCamera()
-        }, 500) // Small delay to show the capture effect
+          showToast("Face captured", "Face image successfully captured")
+        }, 500)
+      } else {
+        setIsCapturing(false)
+        showToast("Capture failed", "Could not capture image", "destructive")
       }
     }
   }
@@ -192,18 +201,27 @@ export default function StudentManagementPage() {
   }
 
   const uploadPhotoFallback = (e: React.MouseEvent) => {
-    e.preventDefault() // Prevent form submission
+    e.preventDefault()
     const input = document.createElement("input")
     input.type = "file"
     input.accept = "image/*"
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          showToast("File too large", "Please select an image smaller than 5MB", "destructive")
+          return
+        }
+        
         const reader = new FileReader()
         reader.onload = (event) => {
           if (event.target?.result) {
             setFaceImage(event.target.result as string)
+            showToast("Image uploaded", "Face image successfully uploaded")
           }
+        }
+        reader.onerror = () => {
+          showToast("Upload failed", "Could not read the image file", "destructive")
         }
         reader.readAsDataURL(file)
       }
@@ -211,19 +229,22 @@ export default function StudentManagementPage() {
     input.click()
   }
 
-  const removeImage = () => setFaceImage(undefined)
+  const removeImage = () => {
+    setFaceImage(undefined)
+    showToast("Image removed", "Face image has been removed")
+  }
 
   // API operations
   const fetchFeeRecords = async (studentId: string) => {
     try {
       const response = await api.get(`/${studentId}/fees`)
       setFeeRecords(prev => ({ ...prev, [studentId]: response.data.data }))
-    } catch (error) {
-      toast({
-        title: "Error fetching fee records",
-        description: "Failed to load fee history",
-        variant: "destructive",
-      })
+    } catch (error: any) {
+      showToast(
+        "Error fetching fee records", 
+        error.response?.data?.message || "Failed to load fee history", 
+        "destructive"
+      )
     }
   }
 
@@ -242,7 +263,6 @@ export default function StudentManagementPage() {
 
       // Reset form
       setFormData({
-        studentId: "",
         name: "",
         email: "",
         phone: "",
@@ -255,16 +275,16 @@ export default function StudentManagementPage() {
       setFaceImage(undefined)
       setShowAddStudent(false)
 
-      toast({
-        title: "Student added successfully",
-        description: `${response.data.data.student.name} has been added.`,
-      })
+      showToast(
+        "Student added successfully", 
+        `${response.data.data.student.name} has been added with ID: ${response.data.data.student.studentId}`
+      )
     } catch (error: any) {
-      toast({
-        title: "Error adding student",
-        description: error.response?.data?.message || "There was an error adding the student.",
-        variant: "destructive",
-      })
+      showToast(
+        "Error adding student", 
+        error.response?.data?.message || "There was an error adding the student.", 
+        "destructive"
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -273,7 +293,6 @@ export default function StudentManagementPage() {
   const handleEditStudent = (student: Student) => {
     setEditedStudent(student)
     setFormData({
-      studentId: student.studentId, // Preserve student ID
       name: student.name,
       email: student.email,
       phone: student.phone,
@@ -306,16 +325,16 @@ export default function StudentManagementPage() {
       setEditedStudent(null)
       setFaceImage(undefined)
 
-      toast({
-        title: "Student updated",
-        description: `${response.data.data.name}'s details have been updated.`,
-      })
+      showToast(
+        "Student updated", 
+        `${response.data.data.name}'s details have been updated.`
+      )
     } catch (error: any) {
-      toast({
-        title: "Error updating student",
-        description: error.response?.data?.message || "There was an error updating the student.",
-        variant: "destructive",
-      })
+      showToast(
+        "Error updating student", 
+        error.response?.data?.message || "There was an error updating the student.", 
+        "destructive"
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -332,16 +351,16 @@ export default function StudentManagementPage() {
       setShowDeleteConfirm(false)
       setSelectedStudent(null)
 
-      toast({
-        title: "Student deleted",
-        description: `${selectedStudent.name} has been removed.`,
-      })
+      showToast(
+        "Student deleted", 
+        `${selectedStudent.name} (ID: ${selectedStudent.studentId}) has been removed.`
+      )
     } catch (error: any) {
-      toast({
-        title: "Error deleting student",
-        description: error.response?.data?.message || "There was an error deleting the student.",
-        variant: "destructive",
-      })
+      showToast(
+        "Error deleting student", 
+        error.response?.data?.message || "There was an error deleting the student.", 
+        "destructive"
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -357,6 +376,7 @@ export default function StudentManagementPage() {
     if (typeof error === 'string') {
       setCameraError("Could not access camera. Please check permissions.")
       setIsScanning(false)
+      showToast("Camera Error", "Could not access camera. Please check permissions.", "destructive")
     }
   }
 
@@ -364,6 +384,7 @@ export default function StudentManagementPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-teal-600" />
+        <span className="sr-only">Loading...</span>
       </div>
     )
   }
@@ -547,7 +568,7 @@ export default function StudentManagementPage() {
                   <TableCell colSpan={7} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Search className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-muted-foreground">No students found</p>
+                      <p className="text-muted-foreground">No students found matching your criteria</p>
                       <Button
                         variant="ghost"
                         onClick={() => {
@@ -580,18 +601,6 @@ export default function StudentManagementPage() {
           <form onSubmit={handleAddStudent}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="studentId">Student ID *</Label>
-                  <Input
-                    id="studentId"
-                    name="studentId"
-                    placeholder="Student's ID"
-                    value={formData.studentId}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
@@ -749,10 +758,7 @@ export default function StudentManagementPage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={(e) => {
-                            e.preventDefault()
-                            uploadPhotoFallback(e)
-                          }}
+                          onClick={uploadPhotoFallback}
                         >
                           Upload Photo
                         </Button>
@@ -775,8 +781,9 @@ export default function StudentManagementPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-green-600">Face image added</p>
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Face image added</span>
                       </div>
                     </>
                   )}
@@ -917,19 +924,6 @@ export default function StudentManagementPage() {
           <form onSubmit={handleUpdateStudent}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-studentId">Student ID *</Label>
-                  <Input
-                    id="edit-studentId"
-                    name="studentId"
-                    placeholder="Student's ID"
-                    value={formData.studentId}
-                    onChange={handleInputChange}
-                    required
-                    disabled // Disabled to prevent changing student ID
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="edit-name">Full Name *</Label>
                   <Input
@@ -1085,10 +1079,7 @@ export default function StudentManagementPage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={(e) => {
-                            e.preventDefault()
-                            uploadPhotoFallback(e)
-                          }}
+                          onClick={uploadPhotoFallback}
                         >
                           Upload Photo
                         </Button>
@@ -1111,8 +1102,9 @@ export default function StudentManagementPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-green-600">Face image added</p>
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Face image added</span>
                       </div>
                     </>
                   )}
@@ -1250,7 +1242,7 @@ export default function StudentManagementPage() {
             </div>
             <div>
               <p className="font-medium">{selectedStudent?.name}</p>
-              <p className="text-sm text-muted-foreground">{selectedStudent?.studentId}</p>
+              <p className="text-sm text-muted-foreground">ID: {selectedStudent?.studentId}</p>
             </div>
           </div>
           <DialogFooter>
@@ -1285,7 +1277,7 @@ export default function StudentManagementPage() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Fee History</DialogTitle>
             <DialogDescription>
-              Payment records for {selectedStudent?.name} ({selectedStudent?.studentId})
+              Payment records for {selectedStudent?.name} (ID: {selectedStudent?.studentId})
             </DialogDescription>
           </DialogHeader>
           
@@ -1329,7 +1321,7 @@ export default function StudentManagementPage() {
                           feeRecords[selectedStudent._id].map(record => (
                             <TableRow key={record._id}>
                               <TableCell>{record.receiptNumber || "N/A"}</TableCell>
-                              <TableCell>{record.date}</TableCell>
+                              <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
                               <TableCell>₹{record.amount.toLocaleString()}</TableCell>
                               <TableCell>
                                 <Badge

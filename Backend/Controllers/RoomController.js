@@ -1,6 +1,7 @@
 import Room from "../Models/Room.js";
 import Student from "../Models/Student.js";
 
+
 // Create Room
 export const createRoom = async (req, res, next) => {
   try {

@@ -73,9 +73,23 @@ export default function RoomAllocationPage() {
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null)
   
   // Form States
-  const [editedRoom, setEditedRoom] = useState<Partial<Room> | null>(null)
+  const [editedRoom, setEditedRoom] = useState<Partial<Room>>({
+    block: "A",
+    roomNumber: "",
+    floor: "1st Floor",
+    capacity: 2,
+    occupiedCount: 0,
+    roomType: "AC Room - Boys",
+    description: "",
+    facilities: [],
+    price: 0,
+    pricePeriod: "month",
+    status: "Available",
+    imageUrl: ""
+  })
   const [imagePreview, setImagePreview] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageInputMethod, setImageInputMethod] = useState<"upload" | "url">("upload")
   
   // Loading States
   const [loading, setLoading] = useState({
@@ -155,7 +169,7 @@ export default function RoomAllocationPage() {
     }
   }
 
-  // Calculate block statistics with proper error handling
+  // Calculate block statistics
   const calculateBlockStats = useCallback((roomsData: Room[]) => {
     const blockStats: Block[] = [
       { 
@@ -197,34 +211,30 @@ export default function RoomAllocationPage() {
     ]
 
     roomsData.forEach((room) => {
-      try {
-        const blockChar = room.block?.[0]?.toUpperCase() || 'A'
-        const blockIndex = blockChar.charCodeAt(0) - 65 // A=0, B=1, etc.
+      const blockChar = room.block?.[0]?.toUpperCase() || 'A'
+      const blockIndex = blockChar.charCodeAt(0) - 65 // A=0, B=1, etc.
+      
+      if (blockIndex >= 0 && blockIndex < blockStats.length) {
+        blockStats[blockIndex].total++
         
-        if (blockIndex >= 0 && blockIndex < blockStats.length) {
-          blockStats[blockIndex].total++
-          
-          switch (room.status) {
-            case "Full":
-              blockStats[blockIndex].occupied++
-              break
-            case "Available":
-              blockStats[blockIndex].vacant++
-              break
-            case "Maintenance":
-              blockStats[blockIndex].maintenance++
-              break
-          }
+        switch (room.status) {
+          case "Full":
+            blockStats[blockIndex].occupied++
+            break
+          case "Available":
+            blockStats[blockIndex].vacant++
+            break
+          case "Maintenance":
+            blockStats[blockIndex].maintenance++
+            break
         }
-      } catch (err) {
-        console.error('Error processing room:', room, err)
       }
     })
 
     setBlocks(blockStats)
   }, [])
 
-  // Filter rooms with proper null checks
+  // Filter rooms
   const filteredRooms = rooms.filter((room) => {
     const searchLower = searchQuery.toLowerCase()
     const roomNumber = String(room.roomNumber || '').toLowerCase()
@@ -238,7 +248,7 @@ export default function RoomAllocationPage() {
     return matchesSearch && matchesBlock && matchesStatus
   })
 
-  // Room actions with proper error handling
+  // Room actions
   const handleViewRoom = (room: Room) => {
     setSelectedRoom(room)
     setShowRoomDetails(true)
@@ -252,6 +262,7 @@ export default function RoomAllocationPage() {
   const handleEditRoom = (room: Room) => {
     setEditedRoom({ ...room })
     setImagePreview(room.imageUrl || "")
+    setImageInputMethod(room.imageUrl ? "url" : "upload")
     setShowEditRoom(true)
   }
 
@@ -262,66 +273,94 @@ export default function RoomAllocationPage() {
       setLoading(prev => ({ ...prev, form: true }))
       
       const formData = new FormData()
+      let imageUrl = editedRoom.imageUrl
+      
+      // Handle image upload if file is selected
       if (imageFile) {
         formData.append('image', imageFile)
       }
       
-      // Convert string values to proper types
       const roomData = {
-        ...editedRoom,
+        block: editedRoom.block?.toUpperCase(),
+        roomNumber: editedRoom.roomNumber?.toUpperCase(),
+        floor: editedRoom.floor,
         capacity: Number(editedRoom.capacity),
+        occupiedCount: Number(editedRoom.occupiedCount),
+        roomType: editedRoom.roomType,
+        description: editedRoom.description,
+        facilities: editedRoom.facilities || [],
         price: Number(editedRoom.price),
-        occupiedCount: Number(editedRoom.occupiedCount)
+        pricePeriod: editedRoom.pricePeriod,
+        status: editedRoom.status,
+        // Only include imageUrl if no file is being uploaded
+        ...(!imageFile && { imageUrl })
       }
       
-      formData.append('data', JSON.stringify(roomData))
+      if (imageFile) {
+        formData.append('data', JSON.stringify(roomData))
+        const { data } = await api.put(`/rooms/${editedRoom._id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        setRooms(rooms.map(r => r._id === data._id ? data : r))
+      } else {
+        const { data } = await api.put(`/rooms/${editedRoom._id}`, roomData)
+        setRooms(rooms.map(r => r._id === data._id ? data : r))
+      }
 
-      const { data } = await api.put(`/rooms/${editedRoom._id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-
-      setRooms(rooms.map(r => r._id === data._id ? data : r))
       toast.success("Room updated successfully")
       setShowEditRoom(false)
       resetForm()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update error:", error)
-      toast.error("Failed to update room. Please try again.")
+      toast.error(error.response?.data?.message || "Failed to update room. Please try again.")
     } finally {
       setLoading(prev => ({ ...prev, form: false }))
     }
   }
 
   const handleCreateRoom = async () => {
-    if (!editedRoom) return
-    
     try {
       setLoading(prev => ({ ...prev, form: true }))
       
       const formData = new FormData()
+      let imageUrl = editedRoom.imageUrl
+      
+      // Handle image upload if file is selected
       if (imageFile) {
         formData.append('image', imageFile)
       }
       
-      // Convert string values to proper types
       const roomData = {
-        ...editedRoom,
+        block: editedRoom.block?.toUpperCase(),
+        roomNumber: editedRoom.roomNumber?.toUpperCase(),
+        floor: editedRoom.floor,
         capacity: Number(editedRoom.capacity),
+        occupiedCount: Number(editedRoom.occupiedCount),
+        roomType: editedRoom.roomType,
+        description: editedRoom.description,
+        facilities: editedRoom.facilities || [],
         price: Number(editedRoom.price),
-        occupiedCount: Number(editedRoom.occupiedCount || 0)
+        pricePeriod: editedRoom.pricePeriod,
+        status: editedRoom.status,
+        // Only include imageUrl if no file is being uploaded
+        ...(!imageFile && { imageUrl })
       }
       
-      formData.append('data', JSON.stringify(roomData))
+      if (imageFile) {
+        formData.append('data', JSON.stringify(roomData))
+        const { data } = await api.post('/rooms', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        setRooms([...rooms, data])
+      } else {
+        const { data } = await api.post('/rooms', roomData)
+        setRooms([...rooms, data])
+      }
 
-      const { data } = await api.post('/rooms', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-
-      setRooms([...rooms, data])
       toast.success("Room created successfully")
       setShowAddRoom(false)
       resetForm()
@@ -363,6 +402,8 @@ export default function RoomAllocationPage() {
         setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+      // Clear URL input when uploading a file
+      setEditedRoom(prev => ({...prev, imageUrl: ""}))
     }
   }
 
@@ -372,9 +413,24 @@ export default function RoomAllocationPage() {
 
   // Form reset
   const resetForm = () => {
-    setEditedRoom(null)
+    setEditedRoom({
+      block: "A",
+      roomNumber: "",
+      floor: "1st Floor",
+      capacity: 2,
+      occupiedCount: 0,
+      roomType: "AC Room - Boys",
+      description: "",
+      facilities: [],
+      price: 0,
+      pricePeriod: "month",
+      status: "Available",
+      imageUrl: ""
+    })
     setImagePreview("")
     setImageFile(null)
+    setImageInputMethod("upload")
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   // Loading spinner component
@@ -427,20 +483,7 @@ export default function RoomAllocationPage() {
             </Button>
             <Button 
               onClick={() => {
-                setEditedRoom({
-                  block: "A",
-                  roomNumber: "",
-                  floor: "1st Floor",
-                  capacity: 2,
-                  occupiedCount: 0,
-                  roomType: "AC Room - Boys",
-                  description: "",
-                  facilities: [],
-                  price: 0,
-                  pricePeriod: "month",
-                  status: "Available",
-                  imageUrl: ""
-                })
+                resetForm()
                 setShowAddRoom(true)
               }}
             >
@@ -719,8 +762,8 @@ export default function RoomAllocationPage() {
               <div className="space-y-2">
                 <Label>Block</Label>
                 <Select 
-                  value={editedRoom?.block || ""}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, block: value}))}
+                  value={editedRoom.block || "A"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, block: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select block" />
@@ -737,15 +780,15 @@ export default function RoomAllocationPage() {
                 <Label>Room Number</Label>
                 <Input 
                   placeholder="Enter room number (e.g., A-101)" 
-                  value={editedRoom?.roomNumber || ""}
-                  onChange={(e) => setEditedRoom(prev => ({...prev!, roomNumber: e.target.value}))}
+                  value={editedRoom.roomNumber || ""}
+                  onChange={(e) => setEditedRoom(prev => ({...prev, roomNumber: e.target.value}))}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Floor</Label>
                 <Select 
-                  value={editedRoom?.floor || ""}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, floor: value}))}
+                  value={editedRoom.floor || "1st Floor"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, floor: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select floor" />
@@ -761,8 +804,8 @@ export default function RoomAllocationPage() {
               <div className="space-y-2">
                 <Label>Capacity</Label>
                 <Select 
-                  value={editedRoom?.capacity?.toString() || ""}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, capacity: parseInt(value)}))}
+                  value={editedRoom.capacity?.toString() || "2"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, capacity: parseInt(value)}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select capacity" />
@@ -777,8 +820,8 @@ export default function RoomAllocationPage() {
               <div className="space-y-2">
                 <Label>Room Type</Label>
                 <Select 
-                  value={editedRoom?.roomType || ""}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, roomType: value}))}
+                  value={editedRoom.roomType || "AC Room - Boys"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, roomType: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -798,15 +841,15 @@ export default function RoomAllocationPage() {
                 <Input 
                   type="number" 
                   placeholder="Enter price" 
-                  value={editedRoom?.price || ""}
-                  onChange={(e) => setEditedRoom(prev => ({...prev!, price: parseFloat(e.target.value)}))}
+                  value={editedRoom.price || ""}
+                  onChange={(e) => setEditedRoom(prev => ({...prev, price: parseFloat(e.target.value)}))}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Price Period</Label>
                 <Select 
-                  value={editedRoom?.pricePeriod || "month"}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, pricePeriod: value}))}
+                  value={editedRoom.pricePeriod || "month"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, pricePeriod: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
@@ -821,8 +864,8 @@ export default function RoomAllocationPage() {
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select 
-                  value={editedRoom?.status || "Available"}
-                  onValueChange={(value) => setEditedRoom(prev => ({...prev!, status: value as "Available" | "Full" | "Maintenance"}))}
+                  value={editedRoom.status || "Available"}
+                  onValueChange={(value) => setEditedRoom(prev => ({...prev, status: value as "Available" | "Full" | "Maintenance"}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -836,36 +879,112 @@ export default function RoomAllocationPage() {
               </div>
             </div>
             
+            {/* Enhanced Image Input Section */}
             <div className="space-y-2">
               <Label>Room Image</Label>
-              <div className="flex items-center gap-4">
-                <div className="relative w-32 h-32 rounded-md overflow-hidden border">
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    ref={fileInputRef}
-                    onChange={handleImageChange}
-                  />
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={triggerFileInput}
-                  >
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    Upload Image
-                  </Button>
-                </div>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  variant={imageInputMethod === "upload" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setImageInputMethod("upload")}
+                >
+                  Upload Image
+                </Button>
+                <Button
+                  variant={imageInputMethod === "url" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setImageInputMethod("url")}
+                >
+                  Enter URL
+                </Button>
               </div>
+
+              {imageInputMethod === "upload" ? (
+                <div className="flex items-center gap-4">
+                  <div className="relative w-32 h-32 rounded-md overflow-hidden border">
+                    {imagePreview ? (
+                      <>
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 rounded-full bg-white/90 hover:bg-white"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setImagePreview("")
+                            setImageFile(null)
+                            if (fileInputRef.current) fileInputRef.current.value = ""
+                          }}
+                        >
+                          <X className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                    />
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={triggerFileInput}
+                    >
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Select Image
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF (max 5MB)</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Enter image URL"
+                    value={editedRoom.imageUrl || ""}
+                    onChange={(e) => {
+                      setEditedRoom(prev => ({...prev, imageUrl: e.target.value}))
+                      setImagePreview(e.target.value)
+                    }}
+                  />
+                  <div className="relative w-32 h-32 rounded-md overflow-hidden border">
+                    {editedRoom.imageUrl ? (
+                      <>
+                        <img 
+                          src={editedRoom.imageUrl} 
+                          alt="URL Preview" 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder-room.jpg"
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 rounded-full bg-white/90 hover:bg-white"
+                          onClick={() => {
+                            setEditedRoom(prev => ({...prev, imageUrl: ""}))
+                            setImagePreview("")
+                          }}
+                        >
+                          <X className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -877,17 +996,17 @@ export default function RoomAllocationPage() {
                       type="checkbox" 
                       id={`facility-${facility}`} 
                       className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                      checked={editedRoom?.facilities?.includes(facility) || false}
+                      checked={editedRoom.facilities?.includes(facility) || false}
                       onChange={(e) => {
-                        const facilities = editedRoom?.facilities || []
+                        const facilities = editedRoom.facilities || []
                         if (e.target.checked) {
                           setEditedRoom(prev => ({
-                            ...prev!,
+                            ...prev,
                             facilities: [...facilities, facility]
                           }))
                         } else {
                           setEditedRoom(prev => ({
-                            ...prev!,
+                            ...prev,
                             facilities: facilities.filter(f => f !== facility)
                           }))
                         }
@@ -905,8 +1024,8 @@ export default function RoomAllocationPage() {
               <Textarea 
                 placeholder="Enter room description" 
                 rows={3} 
-                value={editedRoom?.description || ""}
-                onChange={(e) => setEditedRoom(prev => ({...prev!, description: e.target.value}))}
+                value={editedRoom.description || ""}
+                onChange={(e) => setEditedRoom(prev => ({...prev, description: e.target.value}))}
               />
             </div>
           </div>
@@ -922,7 +1041,7 @@ export default function RoomAllocationPage() {
             </Button>
             <Button 
               onClick={handleCreateRoom}
-              disabled={loading.form || !editedRoom?.roomNumber || !editedRoom?.block}
+              disabled={loading.form || !editedRoom.roomNumber || !editedRoom.block || (!imageFile && !editedRoom.imageUrl)}
             >
               {loading.form ? (
                 <>
@@ -1068,37 +1187,112 @@ export default function RoomAllocationPage() {
                   </div>
                 </div>
                 
+                {/* Enhanced Image Input Section */}
                 <div className="space-y-2">
                   <Label>Room Image</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-32 h-32 rounded-md overflow-hidden border">
-                      <img 
-                        src={imagePreview || editedRoom.imageUrl || "/placeholder-room.jpg"} 
-                        alt={`Room ${editedRoom.roomNumber}`} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder-room.jpg"
+                  <div className="flex gap-2 mb-2">
+                    <Button
+                      variant={imageInputMethod === "upload" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setImageInputMethod("upload")}
+                    >
+                      Upload Image
+                    </Button>
+                    <Button
+                      variant={imageInputMethod === "url" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setImageInputMethod("url")}
+                    >
+                      Enter URL
+                    </Button>
+                  </div>
+
+                  {imageInputMethod === "upload" ? (
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-32 h-32 rounded-md overflow-hidden border">
+                        {imagePreview ? (
+                          <>
+                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-white/90 hover:bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setImagePreview("")
+                                setImageFile(null)
+                                if (fileInputRef.current) fileInputRef.current.value = ""
+                              }}
+                            >
+                              <X className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={fileInputRef}
+                          onChange={handleImageChange}
+                        />
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={triggerFileInput}
+                        >
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          Change Image
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF (max 5MB)</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Enter image URL"
+                        value={editedRoom.imageUrl || ""}
+                        onChange={(e) => {
+                          setEditedRoom(prev => ({...prev, imageUrl: e.target.value}))
+                          setImagePreview(e.target.value)
                         }}
                       />
+                      <div className="relative w-32 h-32 rounded-md overflow-hidden border">
+                        {editedRoom.imageUrl ? (
+                          <>
+                            <img 
+                              src={editedRoom.imageUrl} 
+                              alt="URL Preview" 
+                              className="w-full h-full object-cover" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/placeholder-room.jpg"
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-white/90 hover:bg-white"
+                              onClick={() => {
+                                setEditedRoom(prev => ({...prev, imageUrl: ""}))
+                                setImagePreview("")
+                              }}
+                            >
+                              <X className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        ref={fileInputRef}
-                        onChange={handleImageChange}
-                      />
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={triggerFileInput}
-                      >
-                        <ImageIcon className="mr-2 h-4 w-4" />
-                        Change Image
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
