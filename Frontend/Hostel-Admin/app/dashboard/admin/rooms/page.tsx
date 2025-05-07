@@ -34,6 +34,7 @@ interface Room {
   pricePeriod: string
   imageUrl: string
   status: "Available" | "Full" | "Maintenance"
+  createdAt?: string
 }
 
 interface Block {
@@ -159,6 +160,13 @@ export default function RoomAllocationPage() {
         toast.error('Received unexpected data format from server')
         return
       }
+      
+      // Sort rooms by creation date (newest first)
+      roomsData.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return dateB - dateA
+      })
       
       setRooms(roomsData)
       calculateBlockStats(roomsData)
@@ -303,10 +311,10 @@ export default function RoomAllocationPage() {
             'Content-Type': 'multipart/form-data'
           }
         })
-        setRooms(rooms.map(r => r._id === data._id ? data : r))
+        await fetchRooms() // Refresh data
       } else {
         const { data } = await api.put(`/rooms/${editedRoom._id}`, roomData)
-        setRooms(rooms.map(r => r._id === data._id ? data : r))
+        await fetchRooms() // Refresh data
       }
 
       toast.success("Room updated successfully")
@@ -350,17 +358,16 @@ export default function RoomAllocationPage() {
       
       if (imageFile) {
         formData.append('data', JSON.stringify(roomData))
-        const { data } = await api.post('/rooms', formData, {
+        await api.post('/rooms', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         })
-        setRooms([...rooms, data])
       } else {
-        const { data } = await api.post('/rooms', roomData)
-        setRooms([...rooms, data])
+        await api.post('/rooms', roomData)
       }
 
+      await fetchRooms() // Refresh data
       toast.success("Room created successfully")
       setShowAddRoom(false)
       resetForm()
@@ -379,8 +386,8 @@ export default function RoomAllocationPage() {
       setLoading(prev => ({ ...prev, delete: true }))
       
       await api.delete(`/rooms/${selectedRoom._id}`)
+      await fetchRooms() // Refresh data
 
-      setRooms(rooms.filter(r => r._id !== selectedRoom._id))
       toast.success("Room deleted successfully")
       setShowDeleteConfirm(false)
       setShowRoomDetails(false)
@@ -439,6 +446,12 @@ export default function RoomAllocationPage() {
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
     </div>
   )
+
+  // Get block letter from block name safely
+  const getBlockLetter = (blockName: string) => {
+    const parts = blockName.split(' ')
+    return parts.length > 1 ? parts[1] : 'A'
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -1534,7 +1547,7 @@ export default function RoomAllocationPage() {
                   <h3 className="font-medium mb-3">Rooms in this Block</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {rooms
-                      .filter(room => room.block === selectedBlock.name.split(' ')[1])
+                      .filter(room => room.block === getBlockLetter(selectedBlock.name))
                       .slice(0, 4)
                       .map(room => (
                         <Card key={room._id}>
@@ -1575,7 +1588,7 @@ export default function RoomAllocationPage() {
                     className="w-full mt-4"
                     onClick={() => {
                       setActiveTab("rooms")
-                      setBlockFilter(selectedBlock.name.split(' ')[1])
+                      setBlockFilter(getBlockLetter(selectedBlock.name))
                       setShowBlockDetails(false)
                     }}
                   >
