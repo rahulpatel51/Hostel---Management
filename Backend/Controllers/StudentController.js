@@ -8,7 +8,7 @@ import { uploadMultipleImages } from "../Config/cloudinary.js"
 // Get student profile
 export const getProfile = async (req, res, next) => {
   try {
-    const student = await Student.findOne({ userId: req.user.id }).populate("roomId").populate("disciplinaryRecords")
+    const student = await Student.findOne({ userId: req.user.id }).populate("roomId")
 
     if (!student) {
       return res.status(404).json({
@@ -29,36 +29,42 @@ export const getProfile = async (req, res, next) => {
 // Update student profile
 export const updateProfile = async (req, res, next) => {
   try {
-    const { contactNumber, address } = req.body
+    const { phone, address, image } = req.body;
 
-    // Find student
-    const student = await Student.findOne({ userId: req.user.id })
+    // Find student using user ID from token (middleware must set req.user)
+    const student = await Student.findOne({ userId: req.user.id });
 
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student profile not found",
-      })
+      });
     }
 
-    // Update student
+    // Update the fields (phone, address, image)
     const updatedStudent = await Student.findByIdAndUpdate(
       student._id,
       {
-        contactNumber,
-        address,
+        ...(phone && { phone }),
+        ...(address && { address }),
+        ...(image && { image }),
       },
-      { new: true, runValidators: true },
-    )
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     res.status(200).json({
       success: true,
+      message: "Profile updated successfully",
       data: updatedStudent,
-    })
+    });
   } catch (error) {
-    next(error)
+    console.error("Update Error:", error);
+    next(error);
   }
-}
+};
 
 // Submit complaint
 export const submitComplaint = async (req, res, next) => {

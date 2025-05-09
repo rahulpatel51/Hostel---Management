@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Lock, UserCog, Shield, Home, Info, Contact, LogIn, Mail, Clock, Phone, MapPin } from "lucide-react"
+import { Eye, EyeOff, Lock, Home, Info, Contact, LogIn, Mail, ShieldCheck } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -38,19 +39,18 @@ export default function AdminLoginPage() {
         {
           email: formData.email,
           password: formData.password,
-          role: "admin" // Explicitly specify role for backend
+          role: "admin"
         },
         {
           headers: {
             "Content-Type": "application/json"
           },
-          withCredentials: true // Include cookies if using session-based auth
+          withCredentials: true
         }
       )
 
       if (response.data.success) {
-        toast.success("Login successful!")
-        // Store token if using JWT
+        toast.success("Admin login successful!")
         if (response.data.token) {
           localStorage.setItem("adminToken", response.data.token)
         }
@@ -73,12 +73,60 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-teal-100/30 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
-      {/* Header remains the same */}
+      {/* Enhanced Header */}
       <header className="w-full py-3 px-4 sm:px-6 lg:px-8 border-b border-teal-100/50 dark:border-gray-700 backdrop-blur-sm bg-white/80 dark:bg-gray-900/80 sticky top-0 z-50 shadow-sm">
-        {/* ... existing header code ... */}
+        <div className="container mx-auto">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="relative h-9 w-9 transition-transform group-hover:scale-105">
+                <Image
+                  src="/logo.png"
+                  alt="Goel Group Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                  Goel Group
+                </h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">of Institutions</p>
+              </div>
+            </Link>
+            
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 text-xs bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 px-3 py-1.5 rounded-full border border-teal-200 dark:border-teal-800">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Admin Portal</span>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/" className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400">
+                    <Home className="h-4 w-4" />
+                    <span className="sr-only sm:not-sr-only">Home</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/about" className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400">
+                    <Info className="h-4 w-4" />
+                    <span className="sr-only sm:not-sr-only">About</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/contact" className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400">
+                    <Contact className="h-4 w-4" />
+                    <span className="sr-only sm:not-sr-only">Contact</span>
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* Main Content with Updated Form */}
+      {/* Main Content */}
       <main className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-teal-200 dark:border-gray-700 shadow-lg transition-all hover:shadow-xl hover:-translate-y-1">
           <CardHeader className="space-y-1 text-center">
@@ -92,7 +140,7 @@ export default function AdminLoginPage() {
               Enter your credentials to access administrative controls
             </CardDescription>
           </CardHeader>
-
+          
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -106,14 +154,14 @@ export default function AdminLoginPage() {
                     type="email"
                     placeholder="admin@goelgroup.edu"
                     required
-                    className="pl-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                     value={formData.email}
                     onChange={handleChange}
+                    className="pl-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 </div>
               </div>
-
+              
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
@@ -130,9 +178,9 @@ export default function AdminLoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     required
-                    className="pl-10 pr-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                     value={formData.password}
                     onChange={handleChange}
+                    className="pl-10 pr-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <button
@@ -150,7 +198,7 @@ export default function AdminLoginPage() {
                 </div>
               </div>
             </CardContent>
-
+            
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
@@ -169,14 +217,14 @@ export default function AdminLoginPage() {
                   "Login to Dashboard"
                 )}
               </Button>
-
+              
               <div className="text-center text-sm text-gray-600 dark:text-gray-400">
                 Need admin access?{" "}
                 <Link href="/contact" className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
                   Request credentials
                 </Link>
               </div>
-
+              
               <div className="flex items-center justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
                 <Link href="/login/student" className="flex items-center gap-1 text-teal-600 dark:text-teal-400 hover:underline">
                   <LogIn className="h-3.5 w-3.5" />
@@ -193,9 +241,26 @@ export default function AdminLoginPage() {
         </Card>
       </main>
 
-      {/* Footer remains the same */}
+      {/* Enhanced Footer */}
       <footer className="py-4 px-6 border-t border-teal-100/50 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80">
-        {/* ... existing footer code ... */}
+        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>© {new Date().getFullYear()} Goel Group of Institutions</span>
+            <span className="hidden sm:inline">•</span>
+            <span>All rights reserved</span>
+          </div>
+          <div className="flex gap-4">
+            <Link href="/privacy" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Terms of Service
+            </Link>
+            <Link href="/help" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Help Center
+            </Link>
+          </div>
+        </div>
       </footer>
     </div>
   )

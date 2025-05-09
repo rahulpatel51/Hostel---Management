@@ -25,6 +25,7 @@ router.use(authorize("student"))
 router.get("/profile", getProfile)
 router.put("/profile", updateProfile)
 
+
 // Complaint routes
 router.post("/complaints", submitComplaint)
 router.get("/complaints", getComplaints)

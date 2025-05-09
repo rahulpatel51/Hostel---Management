@@ -8,18 +8,74 @@ import { Eye, EyeOff, School, Shield, Home, Info, Contact, LogIn } from "lucide-
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function StudentLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  })
+  const router = useRouter()
+  const { toast } = useToast()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate login process
-    setTimeout(() => {
-      window.location.href = "/dashboard/student"
-    }, 1500)
+
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        }),
+        credentials: "include" // For cookie-based auth if needed
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed")
+      }
+
+      // Store token if using localStorage
+      if (data.token) {
+        localStorage.setItem("token", data.token)
+      }
+
+      // Redirect based on user role
+      if (data.user?.role === "student") {
+        router.push("/dashboard/student")
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "This portal is for students only",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -35,6 +91,7 @@ export default function StudentLoginPage() {
                   alt="Goel Group Logo"
                   fill
                   className="object-contain"
+                  priority
                 />
               </div>
               <div className="flex flex-col">
@@ -84,31 +141,33 @@ export default function StudentLoginPage() {
               <School className="h-8 w-8 text-teal-600 dark:text-teal-400" />
             </div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
-              Student Portal
+              Student Login
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Access your hostel account and services
+              Sign in to access your hostel account
             </CardDescription>
           </CardHeader>
           
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="studentId" className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
-                  <span>Student ID</span>
+                <Label htmlFor="email" className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                  <span>Email</span>
                   <span className="text-xs text-teal-600 dark:text-teal-400">(required)</span>
                 </Label>
                 <div className="relative">
                   <Input
-                    id="studentId"
-                    type="text"
-                    placeholder="Enter your student ID"
+                    id="email"
+                    type="email"
+                    placeholder="Enter your registered email"
                     required
+                    value={formData.email}
+                    onChange={handleChange}
                     className="pl-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
                 </div>
@@ -130,6 +189,8 @@ export default function StudentLoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     required
+                    value={formData.password}
+                    onChange={handleChange}
                     className="pl-10 pr-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -168,14 +229,14 @@ export default function StudentLoginPage() {
                     Logging in...
                   </>
                 ) : (
-                  "Access Student Dashboard"
+                  "Sign In"
                 )}
               </Button>
               
               <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-                Having trouble?{" "}
-                <Link href="/contact" className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
-                  Contact support
+                Don't have an account?{" "}
+                <Link href="/register/student" className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
+                  Register here
                 </Link>
               </div>
               
@@ -209,6 +270,9 @@ export default function StudentLoginPage() {
             </Link>
             <Link href="/terms" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Terms of Service
+            </Link>
+            <Link href="/help" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Help Center
             </Link>
           </div>
         </div>

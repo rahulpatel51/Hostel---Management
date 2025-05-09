@@ -9,6 +9,7 @@ import {
   getWardenById,
   updateStudent,
   updateWarden,
+  deleteWarden,
   deactivateUser,
   activateUser,
   resetUserPassword,
@@ -36,6 +37,7 @@ router.post("/wardens", createWarden)
 router.get("/wardens", getAllWardens)
 router.get("/wardens/:id", getWardenById)
 router.put("/wardens/:id", updateWarden)
+router.delete("/wardens/:id", deleteWarden) 
 
 
 // User management routes

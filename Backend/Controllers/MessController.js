@@ -155,3 +155,23 @@ export const deleteMess = async (req, res, next) => {
     next(error)
   }
 }
+
+// POST feedback to specific menu
+export const addFeedback = async (req, res) => {
+  const { rating, comment } = req.body
+  const menu = await MessMenu.findById(req.params.id)
+  if (!menu) return res.status(404).json({ message: "Menu not found" })
+
+  const alreadySubmitted = menu.feedbacks.find(fb => fb.student.toString() === req.user._id.toString())
+  if (alreadySubmitted) return res.status(400).json({ message: "You have already submitted feedback" })
+
+  const feedback = {
+    student: req.user._id,
+    rating,
+    comment,
+  }
+
+  menu.feedbacks.push(feedback)
+  await menu.save()
+  res.status(201).json({ message: "Feedback added" })
+}

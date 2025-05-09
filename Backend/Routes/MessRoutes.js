@@ -4,6 +4,7 @@ import {
   getAllMesses,
   getMessById,
   updateMess,
+  addFeedback,
   updateMessMenu,
   deleteMess,
 } from "../Controllers/MessController.js"
@@ -17,6 +18,7 @@ router.use(protect)
 // Routes accessible by all authenticated users
 router.get("/", getAllMesses)
 router.get("/:id", getMessById)
+router.post("/:id/feedback", addFeedback)
 
 // Routes for admin
 router.post("/", authorize("admin"), createMess)

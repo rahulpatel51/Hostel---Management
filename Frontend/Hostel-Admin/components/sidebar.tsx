@@ -54,9 +54,11 @@ export function Sidebar({ role }: SidebarProps) {
   const adminLinks = [
     { name: "Dashboard", href: "/dashboard/admin", icon: Home },
     { name: "Student Management", href: "/dashboard/admin/students", icon: Users },
-    { name: "Room Allocation", href: "/dashboard/admin/rooms", icon: BedDouble },
-    { name: "Fee Management", href: "/dashboard/admin/fees", icon: CreditCard },
     { name: "Staff Management", href: "/dashboard/admin/staff", icon: Users },
+    { name: "Room Management", href: "/dashboard/admin/rooms", icon: BedDouble },
+    { name: "Room Allocation", href: "/dashboard/admin/roomAllocation", icon: BedDouble },
+    { name: "Mess Menu", href: "/dashboard/admin/mess", icon: BedDouble },
+    { name: "Fee Management", href: "/dashboard/admin/fees", icon: CreditCard },
     { name: "Complaints", href: "/dashboard/admin/complaints", icon: MessageSquare },
     { name: "Disciplinary Actions", href: "/dashboard/admin/discipline", icon: ClipboardList },
     { name: "Notices", href: "/dashboard/admin/notices", icon: Bell },

@@ -25,7 +25,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 // Configure Axios instance
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "http://localhost:5000/api/admin",
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -55,7 +55,7 @@ api.interceptors.response.use(
 
 type Warden = {
   _id: string;
-  userId: {
+  userId?: {
     _id: string;
     name: string;
     email: string;
@@ -93,7 +93,7 @@ export default function StaffManagementPage() {
   
   // Selected staff states
   const [selectedWarden, setSelectedWarden] = useState<Warden | null>(null);
-  const [editedWarden, setEditedWarden] = useState<Warden | null>(null);
+  const [editedWarden, setEditedWarden] = useState<Partial<Warden> | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [newStatus, setNewStatus] = useState<"Active" | "On Leave" | "Inactive">("Active");
 
@@ -118,7 +118,7 @@ export default function StaffManagementPage() {
     const fetchWardens = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get("/admin/wardens");
+        const response = await api.get("/wardens");
         // Ensure the response data is an array
         const data = Array.isArray(response.data) ? response.data : [];
         setWardens(data);
@@ -183,7 +183,7 @@ export default function StaffManagementPage() {
         formData.append("image", imageFile);
       }
 
-      const response = await api.post("/admin/wardens", formData, {
+      const response = await api.post("/wardens", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -239,25 +239,25 @@ export default function StaffManagementPage() {
   };
 
   const handleUpdateProfile = async () => {
-    if (!editedWarden) return;
+    if (!editedWarden || !editedWarden._id) return;
 
     try {
       setIsLoading(true);
       
       const formData = new FormData();
-      formData.append("name", editedWarden.name);
-      formData.append("email", editedWarden.email);
-      formData.append("employeeId", editedWarden.employeeId);
-      formData.append("contactNumber", editedWarden.contactNumber);
-      formData.append("qualification", editedWarden.qualification);
-      formData.append("address", editedWarden.address);
-      formData.append("aadhaar", editedWarden.aadhaar);
+      if (editedWarden.name) formData.append("name", editedWarden.name);
+      if (editedWarden.email) formData.append("email", editedWarden.email);
+      if (editedWarden.employeeId) formData.append("employeeId", editedWarden.employeeId);
+      if (editedWarden.contactNumber) formData.append("contactNumber", editedWarden.contactNumber);
+      if (editedWarden.qualification) formData.append("qualification", editedWarden.qualification);
+      if (editedWarden.address) formData.append("address", editedWarden.address);
+      if (editedWarden.aadhaar) formData.append("aadhaar", editedWarden.aadhaar);
       
       if (imageFile) {
         formData.append("image", imageFile);
       }
 
-      const response = await api.put(`/admin/wardens/${editedWarden._id}`, formData, {
+      const response = await api.put(`/wardens/${editedWarden._id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -293,7 +293,7 @@ export default function StaffManagementPage() {
 
     try {
       setIsLoading(true);
-      await api.patch(`/admin/wardens/${selectedWarden._id}/password`, {
+      await api.patch(`/wardens/${selectedWarden._id}/password`, {
         newPassword
       });
 
@@ -325,7 +325,7 @@ export default function StaffManagementPage() {
 
     try {
       setIsLoading(true);
-      const response = await api.patch(`/admin/wardens/${selectedWarden._id}/status`, { status: newStatus });
+      const response = await api.patch(`/wardens/${selectedWarden._id}/status`, { status: newStatus });
       const updatedWarden = response.data;
 
       setWardens((prevWardens) =>
@@ -359,7 +359,7 @@ export default function StaffManagementPage() {
   const handleDeleteWarden = async (wardenId: string) => {
     try {
       setIsLoading(true);
-      await api.delete(`/admin/wardens/${wardenId}`);
+      await api.delete(`/wardens/${wardenId}`);
 
       setWardens(wardens.filter(w => w._id !== wardenId));
       
@@ -895,7 +895,7 @@ export default function StaffManagementPage() {
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={editedWarden.image || editedWarden.userId?.profilePicture} />
-                  <AvatarFallback>{editedWarden.name.substring(0, 2)}</AvatarFallback>
+                  <AvatarFallback>{editedWarden.name?.substring(0, 2)}</AvatarFallback>
                 </Avatar>
                 <div>
                   <Input
@@ -911,7 +911,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-name">Name</Label>
                   <Input
                     id="edit-name"
-                    value={editedWarden.name}
+                    value={editedWarden.name || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, name: e.target.value})}
                   />
                 </div>
@@ -919,7 +919,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-employeeId">Employee ID</Label>
                   <Input
                     id="edit-employeeId"
-                    value={editedWarden.employeeId}
+                    value={editedWarden.employeeId || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, employeeId: e.target.value})}
                   />
                 </div>
@@ -928,7 +928,7 @@ export default function StaffManagementPage() {
                   <Input
                     id="edit-email"
                     type="email"
-                    value={editedWarden.email}
+                    value={editedWarden.email || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, email: e.target.value})}
                   />
                 </div>
@@ -936,7 +936,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-contact">Contact</Label>
                   <Input
                     id="edit-contact"
-                    value={editedWarden.contactNumber}
+                    value={editedWarden.contactNumber || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, contactNumber: e.target.value})}
                   />
                 </div>
@@ -944,7 +944,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-qualification">Qualification</Label>
                   <Input
                     id="edit-qualification"
-                    value={editedWarden.qualification}
+                    value={editedWarden.qualification || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, qualification: e.target.value})}
                   />
                 </div>
@@ -952,7 +952,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-aadhaar">Aadhaar</Label>
                   <Input
                     id="edit-aadhaar"
-                    value={editedWarden.aadhaar}
+                    value={editedWarden.aadhaar || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, aadhaar: e.target.value})}
                   />
                 </div>
@@ -960,7 +960,7 @@ export default function StaffManagementPage() {
                   <Label htmlFor="edit-address">Address</Label>
                   <Input
                     id="edit-address"
-                    value={editedWarden.address}
+                    value={editedWarden.address || ""}
                     onChange={(e) => setEditedWarden({...editedWarden, address: e.target.value})}
                   />
                 </div>

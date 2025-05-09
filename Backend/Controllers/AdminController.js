@@ -362,6 +362,18 @@ export const updateWarden = async (req, res, next) => {
   }
 };
 
+export const deleteWarden = async (req, res) => {
+  try {
+    const warden = await Warden.findByIdAndDelete(req.params.id)
+    if (!warden) {
+      return res.status(404).json({ message: "Warden not found" })
+    }
+    res.status(200).json({ message: "Warden deleted successfully" })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
 // Deactivate User
 export const deactivateUser = async (req, res, next) => {
   try {

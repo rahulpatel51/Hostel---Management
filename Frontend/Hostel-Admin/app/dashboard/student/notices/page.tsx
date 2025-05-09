@@ -4,26 +4,34 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Bell, CalendarDays, Clock } from "lucide-react";
+import { Search, Bell, CalendarDays, Clock, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/use-toast";
+import axios from "axios";
 
 type Notice = {
-  id: string;
+  _id: string;
   title: string;
-  category: "General" | "Academic" | "Events" | "Maintenance";
   content: string;
-  publishDate: string;
-  expiryDate: string;
-  status: "Active" | "Expired";
-  author: {
-    name: string;
-    avatar: string;
-    role: string;
+  category: string;
+  importance: string;
+  targetAudience: string;
+  attachments: {
+    url: string;
+    public_id: string;
+  }[];
+  publishedBy?: {
+    _id: string;
+    username?: string;
+    profilePicture?: string;
   };
+  createdAt: string;
+  updatedAt: string;
+  expiryDate: string;
+  isActive: boolean;
 };
 
 export default function StudentNoticesPage() {
@@ -33,146 +41,159 @@ export default function StudentNoticesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("active");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data fetch - replace with actual API call
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchNotices = async () => {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setIsLoading(true);
+        setError(null);
         
-        const mockData: Notice[] = [
-          {
-            id: "NOT001",
-            title: "Hostel Day Celebration",
-            category: "Events",
-            content: "Annual hostel day celebration will be held on May 15th. All students are invited to participate in various cultural programs and competitions. Lunch will be provided for all attendees.",
-            publishDate: "2023-05-05",
-            expiryDate: "2023-05-20",
-            status: "Active",
-            author: {
-              name: "Dr. Sharma",
-              avatar: "/warden-avatar.jpg",
-              role: "Chief Warden"
-            }
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("Authentication required");
+        }
+
+        const response = await axios.get("http://localhost:5000/api/notices", {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-          {
-            id: "NOT002",
-            title: "Internet Maintenance Schedule",
-            category: "Maintenance",
-            content: "Internet services will be unavailable from 10PM to 2AM on May 10th for scheduled maintenance. We apologize for the inconvenience and appreciate your understanding.",
-            publishDate: "2023-05-04",
-            expiryDate: "2023-05-10",
-            status: "Expired",
-            author: {
-              name: "IT Department",
-              avatar: "/it-avatar.jpg",
-              role: "Maintenance Team"
-            }
-          },
-          {
-            id: "NOT003",
-            title: "Fee Payment Deadline",
-            category: "Academic",
-            content: "Last date for fee payment is May 15th. Late payments will incur a penalty of ₹50 per day. Please make payments at the accounts office between 10AM-4PM.",
-            publishDate: "2023-05-03",
-            expiryDate: "2023-05-15",
-            status: "Active",
-            author: {
-              name: "Accounts Office",
-              avatar: "/accounts-avatar.jpg",
-              role: "Administration"
-            }
-          },
-          {
-            id: "NOT004",
-            title: "Summer Vacation Schedule",
-            category: "Academic",
-            content: "Hostel will remain closed during summer vacation from June 1st to July 15th. All students must vacate their rooms by May 31st. Limited accommodation available for special cases - apply by May 20th.",
-            publishDate: "2023-04-30",
-            expiryDate: "2023-05-30",
-            status: "Active",
-            author: {
-              name: "Dr. Gupta",
-              avatar: "/admin-avatar.jpg",
-              role: "Hostel Administrator"
-            }
-          },
-          {
-            id: "NOT005",
-            title: "New Sports Facilities",
-            category: "General",
-            content: "New badminton courts and table tennis tables have been installed in the recreation area. Available for use from 4PM-8PM daily. Equipment can be borrowed from the sports room with ID card.",
-            publishDate: "2023-04-28",
-            expiryDate: "2023-05-28",
-            status: "Expired",
-            author: {
-              name: "Sports Committee",
-              avatar: "/sports-avatar.jpg",
-              role: "Student Council"
-            }
-          }
-        ];
-        
-        setNotices(mockData);
-      } catch (error) {
+        });
+
+        if (response.data?.success) {
+          setNotices(response.data.data || []);
+        } else {
+          throw new Error(response.data?.message || "Failed to fetch notices");
+        }
+      } catch (err) {
+        console.error("Error fetching notices:", err);
+        const errorMessage = err instanceof Error ? err.message : "Failed to load notices";
+        setError(errorMessage);
         toast({
           title: "Error",
-          description: "Failed to load notices",
-          variant: "destructive"
+          description: errorMessage,
+          variant: "destructive",
         });
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchNotices();
   }, [toast]);
 
-  // Filter notices based on search term, category and status
   useEffect(() => {
-    let filtered = notices;
-    
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(notice => 
-        notice.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        notice.content.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Apply category filter
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter(notice => notice.category.toLowerCase() === categoryFilter.toLowerCase());
-    }
-    
-    // Apply status filter
-    filtered = filtered.filter(notice => activeTab === "active" ? notice.status === "Active" : notice.status === "Expired");
-    
-    setFilteredNotices(filtered);
+    const filterNotices = () => {
+      let result = [...notices];
+
+      // Apply search filter
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        result = result.filter(
+          notice =>
+            notice.title.toLowerCase().includes(term) ||
+            notice.content.toLowerCase().includes(term)
+        );
+      }
+
+      // Apply category filter
+      if (categoryFilter !== "all") {
+        result = result.filter(
+          notice => notice.category.toLowerCase() === categoryFilter.toLowerCase()
+        );
+      }
+
+      // Apply status filter
+      const now = new Date();
+      result = result.filter(notice => {
+        const isExpired = notice.expiryDate && new Date(notice.expiryDate) < now;
+        return activeTab === "active" 
+          ? notice.isActive && !isExpired 
+          : !notice.isActive || isExpired;
+      });
+
+      setFilteredNotices(result);
+    };
+
+    filterNotices();
   }, [searchTerm, categoryFilter, activeTab, notices]);
 
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    if (!dateString) return "No expiry date";
+    try {
+      const options: Intl.DateTimeFormatOptions = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    } catch {
+      return "Invalid date";
+    }
   };
 
   const getCategoryBadge = (category: string) => {
-    switch (category) {
-      case "Events":
-        return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400">Event</Badge>;
-      case "Maintenance":
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">Maintenance</Badge>;
-      case "Academic":
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">Academic</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-900/30 dark:text-gray-400">General</Badge>;
-    }
+    const categoryMap: Record<string, { className: string; label: string }> = {
+      events: {
+        className: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+        label: "Event"
+      },
+      maintenance: {
+        className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+        label: "Maintenance"
+      },
+      academic: {
+        className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+        label: "Academic"
+      },
+      default: {
+        className: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+        label: "General"
+      }
+    };
+
+    const normalizedCategory = (category || "").toLowerCase();
+    const badgeInfo = categoryMap[normalizedCategory] || categoryMap.default;
+
+    return (
+      <Badge className={`${badgeInfo.className} hover:bg-opacity-80`}>
+        {badgeInfo.label}
+      </Badge>
+    );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p>Loading notices...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <Bell className="h-10 w-10 text-destructive" />
+        <p className="text-destructive">{error}</p>
+        <Button 
+          variant="outline" 
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Hostel Notices</h1>
-        <p className="text-muted-foreground">Stay updated with important announcements from the hostel administration</p>
+        <p className="text-muted-foreground">Stay updated with important announcements</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
@@ -221,64 +242,22 @@ export default function StudentNoticesPage() {
           <div className="grid gap-4">
             {filteredNotices.length > 0 ? (
               filteredNotices.map((notice) => (
-                <Card key={notice.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{notice.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={notice.author.avatar} alt={notice.author.name} />
-                            <AvatarFallback>{notice.author.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span>{notice.author.name} • {notice.author.role}</span>
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        {getCategoryBadge(notice.category)}
-                        <Badge 
-                          variant={notice.status === "Active" ? "default" : "outline"}
-                          className={notice.status === "Active" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}
-                        >
-                          {notice.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="prose dark:prose-invert max-w-none">
-                      {notice.content.split('\n').map((paragraph, i) => (
-                        <p key={i} className="mb-2 last:mb-0">{paragraph}</p>
-                      ))}
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <CalendarDays className="h-4 w-4" />
-                        <span>Published: {formatDate(notice.publishDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Expires: {formatDate(notice.expiryDate)}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <NoticeCard 
+                  key={notice._id}
+                  notice={notice}
+                  formatDate={formatDate}
+                  getCategoryBadge={getCategoryBadge}
+                  isActive={true}
+                />
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
-                <Bell className="h-10 w-10" />
-                <p>No active notices found</p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchTerm("");
-                    setCategoryFilter("all");
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </div>
+              <EmptyNoticeState 
+                onClearFilters={() => {
+                  setSearchTerm("");
+                  setCategoryFilter("all");
+                }}
+                message="No active notices found"
+              />
             )}
           </div>
         </TabsContent>
@@ -287,63 +266,141 @@ export default function StudentNoticesPage() {
           <div className="grid gap-4">
             {filteredNotices.length > 0 ? (
               filteredNotices.map((notice) => (
-                <Card key={notice.id} className="bg-gray-50 dark:bg-gray-800/50 hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{notice.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={notice.author.avatar} alt={notice.author.name} />
-                            <AvatarFallback>{notice.author.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span>{notice.author.name} • {notice.author.role}</span>
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        {getCategoryBadge(notice.category)}
-                        <Badge variant="outline">Expired</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="prose dark:prose-invert max-w-none">
-                      {notice.content.split('\n').map((paragraph, i) => (
-                        <p key={i} className="mb-2 last:mb-0">{paragraph}</p>
-                      ))}
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <CalendarDays className="h-4 w-4" />
-                        <span>Published: {formatDate(notice.publishDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Expired: {formatDate(notice.expiryDate)}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <NoticeCard 
+                  key={notice._id}
+                  notice={notice}
+                  formatDate={formatDate}
+                  getCategoryBadge={getCategoryBadge}
+                  isActive={false}
+                />
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
-                <Bell className="h-10 w-10" />
-                <p>No past notices found</p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchTerm("");
-                    setCategoryFilter("all");
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </div>
+              <EmptyNoticeState 
+                onClearFilters={() => {
+                  setSearchTerm("");
+                  setCategoryFilter("all");
+                }}
+                message="No past notices found"
+              />
             )}
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function NoticeCard({ 
+  notice, 
+  formatDate, 
+  getCategoryBadge,
+  isActive 
+}: {
+  notice: Notice;
+  formatDate: (date: string) => string;
+  getCategoryBadge: (category: string) => React.ReactNode;
+  isActive: boolean;
+}) {
+  // Safely get author information with fallbacks
+  const authorName = notice.publishedBy?.username || 'Unknown Author';
+  const authorAvatar = notice.publishedBy?.profilePicture;
+  const authorInitial = authorName.charAt(0).toUpperCase();
+
+  return (
+    <Card className={`hover:shadow-md transition-shadow ${!isActive ? "bg-muted/50" : ""}`}>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+          <div>
+            <CardTitle className="text-lg">{notice.title}</CardTitle>
+            <CardDescription className="flex items-center gap-2 mt-1">
+              <Avatar className="h-6 w-6">
+                <AvatarImage 
+                  src={authorAvatar} 
+                  alt={authorName} 
+                />
+                <AvatarFallback>
+                  {authorInitial}
+                </AvatarFallback>
+              </Avatar>
+              <span>{authorName}</span>
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {getCategoryBadge(notice.category)}
+            <Badge 
+              variant={isActive ? "default" : "outline"}
+              className={isActive ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}
+            >
+              {isActive ? "Active" : "Expired"}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="prose dark:prose-invert max-w-none">
+          {notice.content.split('\n').map((paragraph, i) => (
+            <p key={i} className="mb-2 last:mb-0">{paragraph}</p>
+          ))}
+        </div>
+        
+        {notice.attachments?.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {notice.attachments.map((attachment) => (
+              <a 
+                key={attachment.public_id}
+                href={attachment.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                View Attachment
+              </a>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <CalendarDays className="h-4 w-4" />
+            <span>Published: {formatDate(notice.createdAt)}</span>
+          </div>
+          {notice.expiryDate && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>
+                {isActive ? "Expires: " : "Expired: "} 
+                {formatDate(notice.expiryDate)}
+              </span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyNoticeState({ 
+  message,
+  onClearFilters 
+}: {
+  message: string;
+  onClearFilters: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
+      <Bell className="h-10 w-10" />
+      <p>{message}</p>
+      <Button 
+        variant="outline" 
+        onClick={onClearFilters}
+      >
+        Clear filters
+      </Button>
     </div>
   );
 }

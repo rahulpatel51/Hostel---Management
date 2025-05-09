@@ -8,18 +8,74 @@ import { Eye, EyeOff, ShieldCheck, Home, Info, Contact, LogIn } from "lucide-rea
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function WardenLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  })
+  const router = useRouter()
+  const { toast } = useToast()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate login process
-    setTimeout(() => {
-      window.location.href = "/dashboard/warden"
-    }, 1500)
+
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        }),
+        credentials: "include"
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed")
+      }
+
+      // Store token if using localStorage
+      if (data.token) {
+        localStorage.setItem("token", data.token)
+      }
+
+      // Redirect based on user role
+      if (data.user?.role === "warden") {
+        router.push("/dashboard/warden")
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "This portal is for wardens only",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -35,6 +91,7 @@ export default function WardenLoginPage() {
                   alt="Goel Group Logo"
                   fill
                   className="object-contain"
+                  priority
                 />
               </div>
               <div className="flex flex-col">
@@ -84,7 +141,7 @@ export default function WardenLoginPage() {
               <ShieldCheck className="h-8 w-8 text-teal-600 dark:text-teal-400" />
             </div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
-              Warden Portal
+              Warden Login
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
               Access hostel management controls and student records
@@ -104,6 +161,8 @@ export default function WardenLoginPage() {
                     type="email"
                     placeholder="warden@goelgroup.edu"
                     required
+                    value={formData.email}
+                    onChange={handleChange}
                     className="pl-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -130,6 +189,8 @@ export default function WardenLoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     required
+                    value={formData.password}
+                    onChange={handleChange}
                     className="pl-10 pr-10 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -209,6 +270,9 @@ export default function WardenLoginPage() {
             </Link>
             <Link href="/terms" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Terms of Service
+            </Link>
+            <Link href="/help" className="text-xs text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Help Center
             </Link>
           </div>
         </div>

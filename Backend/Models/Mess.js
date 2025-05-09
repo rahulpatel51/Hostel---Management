@@ -1,68 +1,19 @@
-import mongoose from "mongoose"
+import mongoose, { Document, Schema } from 'mongoose';
+import { IMenu } from '../interfaces/IMenu';
 
-const messMenuSchema = new mongoose.Schema({
-  day: {
-    type: String,
-    enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
-    required: true,
-  },
-  breakfast: {
-    items: [String],
-    time: String,
-  },
-  lunch: {
-    items: [String],
-    time: String,
-  },
-  snacks: {
-    items: [String],
-    time: String,
-  },
-  dinner: {
-    items: [String],
-    time: String,
-  },
-  specialMenu: {
-    type: Boolean,
-    default: false,
-  },
-})
+export interface IMenuModel extends IMenu, Document {}
 
-const messSchema = new mongoose.Schema(
+const MenuSchema: Schema = new Schema(
   {
-    name: {
-      type: String,
-      required: true,
-    },
-    weeklyMenu: [messMenuSchema],
-    currentMenu: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "MessMenu",
-    },
-    messManager: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    contactNumber: {
-      type: String,
-    },
-    capacity: {
-      type: Number,
-    },
-    timings: {
-      breakfast: String,
-      lunch: String,
-      snacks: String,
-      dinner: String,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    date: { type: Date, required: true },
+    day: { type: String, required: true },
+    breakfast: { type: String, required: true },
+    lunch: { type: String, required: true },
+    snacks: { type: String },
+    dinner: { type: String, required: true },
+    addedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
-  { timestamps: true },
-)
+  { timestamps: true }
+);
 
-const Mess = mongoose.model("Mess", messSchema)
-
-export default Mess
+export default mongoose.model<IMenuModel>('Menu', MenuSchema);
