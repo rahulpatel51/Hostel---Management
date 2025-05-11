@@ -64,45 +64,217 @@ export const updateProfile = async (req, res, next) => {
   }
 }
 
-// Get all students under warden's blocks
-export const getStudents = async (req, res, next) => {
+// Create student
+export const createStudent = async (req, res, next) => {
   try {
-    // Find warden
-    const warden = await Warden.findOne({ userId: req.user.id })
+    const { name, email, password, course, year, phone, image, address } = req.body;
 
-    if (!warden) {
-      return res.status(404).json({
+    // Check if email already exists in both Student and User collections
+    const existingStudent = await Student.findOne({ email });
+    const existingUser = await User.findOne({ email });
+    if (existingStudent || existingUser) {
+      return res.status(400).json({
         success: false,
-        message: "Warden profile not found",
-      })
+        message: "User/Student with this email already exists",
+      });
     }
 
-    // Get rooms in assigned blocks
-    const rooms = await Room.find({
-      block: { $in: warden.assignedBlocks },
-    })
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const roomIds = rooms.map((room) => room._id)
+    // Step 1: Generate studentId with 'STD' + Random 4 digits
+    const generateRandomStudentId = () => {
+      const randomDigits = Math.floor(1000 + Math.random() * 9000);
+      return `STD${randomDigits}`;
+    };
 
-    // Get students in those rooms
-    const students = await Student.find({
-      roomId: { $in: roomIds },
-    })
-      .populate({
-        path: "userId",
-        select: "username email profilePicture isActive",
-      })
-      .populate("roomId")
+    let studentId = generateRandomStudentId();
+
+    // Ensure studentId is unique
+    while (await Student.findOne({ studentId })) {
+      studentId = generateRandomStudentId();
+    }
+
+    // Step 2: Create user with studentId
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: "student",
+      createdBy: req.user?.id || null,
+      studentId,
+      address, // Save address in User (optional, if needed)
+    });
+
+    // Step 3: Generate faceId
+    const faceId = `FACE${studentId}`;
+
+    // Step 4: Create student
+    const student = new Student({
+      userId: user._id,
+      name,
+      email,
+      password: hashedPassword,
+      course,
+      year,
+      phone,
+      studentId,
+      faceId,
+      address, // ✅ Add address to Student model
+    });
+
+    // Step 5: Upload image if provided
+    if (image) {
+      const imageUrl = await uploadImage(image, `hostel_management/students/${student._id}`);
+      student.image = imageUrl;
+      await User.findByIdAndUpdate(user._id, { profilePicture: imageUrl });
+    }
+
+    // Save student
+    await student.save();
+
+    // Send response
+    res.status(201).json({
+      success: true,
+      message: "Student created successfully",
+      data: {
+        user: {
+          id: user._id,
+          studentId,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          address, // ✅ Add address in response
+          profilePicture: student.image || null,
+        },
+        student: {
+          id: student._id,
+          studentId,
+          faceId,
+          name,
+          email,
+          course,
+          year,
+          phone,
+          address, 
+          image: student.image || null,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get all students
+export const getAllStudents = async (req, res, next) => {
+  try {
+    const students = await Student.find().select("-password").populate("userId", "name email profilePicture isActive lastLogin");
 
     res.status(200).json({
       success: true,
       count: students.length,
       data: students,
-    })
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
+
+// Get student by ID
+export const getStudentById = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.params.id).select("-password").populate("userId", "name email profilePicture isActive lastLogin");
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: student,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update student
+export const updateStudent = async (req, res, next) => {
+  try {
+    const { name, email, password, course, year, phone, image } = req.body;
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    if (name) student.name = name;
+    if (email) student.email = email;
+    if (course) student.course = course;
+    if (year) student.year = year;
+    if (phone) student.phone = phone;
+
+    if (password) {
+      const hashed = await bcrypt.hash(password, 12);
+      student.password = hashed;
+    }
+
+    if (image) {
+      const uploaded = await uploadImage(image, `hostel_management/students/${student._id}`);
+      student.image = uploaded;
+    }
+
+    await student.save();
+
+    await User.findByIdAndUpdate(
+      student.userId,
+      {
+        name: student.name,
+        email: student.email,
+        ...(password && { password: student.password }),
+        ...(image && { profilePicture: student.image }),
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Student updated successfully",
+      data: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        course: student.course,
+        year: student.year,
+        phone: student.phone,
+        image: student.image,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete student
+export const deleteStudent = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    await User.findByIdAndDelete(student.userId);
+    await Student.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Student deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Get all rooms under warden's blocks
 export const getRooms = async (req, res, next) => {
@@ -302,6 +474,9 @@ export const updateLeaveStatus = async (req, res, next) => {
   }
 }
 
+
+
+
 // Mark attendance
 export const markAttendance = async (req, res, next) => {
   try {
@@ -396,6 +571,14 @@ export const getAttendanceByDate = async (req, res, next) => {
     next(error)
   }
 }
+
+
+
+
+
+
+
+
 
 // Create disciplinary record
 export const createDisciplinaryRecord = async (req, res, next) => {

@@ -16,6 +16,9 @@ import {
   generateReport,
   getAllReports,
   getReportById,
+  markAttendance,
+  getAttendanceByDate,
+  getAttendanceDates
 } from "../Controllers/AdminController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -49,5 +52,17 @@ router.put("/users/:id/reset-password", resetUserPassword)
 router.post("/reports", generateReport)
 router.get("/reports", getAllReports)
 router.get("/reports/:id", getReportById)
+
+// Attendance routes
+// Mark attendance (bulk operation)
+router.post('/attendance', markAttendance);
+
+// Get attendance by date
+router.get('/attendance/:date', getAttendanceByDate);
+
+// Get all unique dates with attendance records
+router.get('/attendance/dates/all', getAttendanceDates); // FIRST
+router.get('/:date', getAttendanceByDate);    // THEN
+
 
 export default router

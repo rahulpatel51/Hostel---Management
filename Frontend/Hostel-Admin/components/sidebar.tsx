@@ -57,6 +57,7 @@ export function Sidebar({ role }: SidebarProps) {
     { name: "Staff Management", href: "/dashboard/admin/staff", icon: Users },
     { name: "Room Management", href: "/dashboard/admin/rooms", icon: BedDouble },
     { name: "Room Allocation", href: "/dashboard/admin/roomAllocation", icon: BedDouble },
+    { name: "Attendance", href: "/dashboard/admin/attendance", icon: ClipboardCheck },
     { name: "Fee Management", href: "/dashboard/admin/fees", icon: CreditCard },
     { name: "Complaints", href: "/dashboard/admin/complaints", icon: MessageSquare },
     { name: "Disciplinary Actions", href: "/dashboard/admin/discipline", icon: ClipboardList },

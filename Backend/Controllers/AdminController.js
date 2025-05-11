@@ -2,6 +2,7 @@ import User from "../Models/User.js";
 import Student from "../Models/Student.js";
 import Warden from "../Models/Warden.js";
 import Room from "../Models/Room.js";
+import Attendance from '../Models/Attendance.js';
 import Report from "../Models/Report.js";
 import { uploadImage } from "../Config/cloudinary.js";
 import bcrypt from "bcryptjs";
@@ -481,4 +482,164 @@ export const getReportById = async (req, res, next) => {
   } catch (error) {
     next(error);
   };
+};
+
+
+export const markAttendance = async (req, res, next) => {
+  try {
+    const { date, session, attendance } = req.body;
+    const markedBy = req.user.id;
+
+    if (!date || !session || !attendance || !Array.isArray(attendance)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide date, session, and attendance data"
+      });
+    }
+
+    if (!['morning', 'evening'].includes(session)) {
+      return res.status(400).json({
+        success: false,
+        message: "Session must be either 'morning' or 'evening'"
+      });
+    }
+
+    const operations = attendance.map(item => {
+      const sessionField = session === 'morning' ? 'morningStatus' : 'eveningStatus';
+
+      return {
+        updateOne: {
+          filter: {
+            student: item.studentId,
+            date: new Date(date)
+          },
+          update: {
+            $set: {
+              [sessionField]: item.status,
+              markedBy
+            },
+            $setOnInsert: {
+              student: item.studentId,
+              date: new Date(date)
+            }
+          },
+          upsert: true
+        }
+      };
+    });
+
+    const result = await Attendance.bulkWrite(operations);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        upsertedCount: result.upsertedCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// Get attendance records for a specific date - Admin version
+export const getAttendanceByDate = async (req, res, next) => {
+  try {
+    const { date } = req.params;
+
+    // Validate date format
+    if (!date || isNaN(new Date(date).getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format"
+      });
+    }
+
+    // Get all students (admin has access to all)
+    const students = await Student.find()
+      .select('_id name studentId roomId userId')
+      .populate({
+        path: 'userId',
+        select: 'username profilePicture'
+      })
+      .populate({
+        path: 'roomId',
+        select: 'roomNumber block'
+      });
+
+    // Get attendance records for all students on the specified date
+    const attendanceRecords = await Attendance.find({
+      date: {
+        $gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
+        $lt: new Date(new Date(date).setHours(23, 59, 59, 999))
+      }
+    }).populate({
+      path: 'student',
+      select: 'name studentId roomId userId',
+      populate: [
+        {
+          path: 'userId',
+          select: 'username profilePicture'
+        },
+        {
+          path: 'roomId',
+          select: 'roomNumber block'
+        }
+      ]
+    });
+
+    // Create a map of students without attendance records
+    const studentsWithoutRecords = students.filter(student => 
+      !attendanceRecords.some(record => record.student._id.equals(student._id))
+    );
+
+    // Format response with all students
+    const responseData = [
+      ...attendanceRecords,
+      ...studentsWithoutRecords.map(student => ({
+        student,
+        date: new Date(date),
+        morningStatus: 'absent', // Default status
+        eveningStatus: 'absent', // Default status
+        isNewRecord: true
+      }))
+    ];
+
+    res.status(200).json({
+      success: true,
+      count: responseData.length,
+      data: responseData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get all unique dates with attendance records - Admin version
+export const getAttendanceDates = async (req, res, next) => {
+  try {
+    // Get unique dates with attendance records (admin has access to all)
+    const dates = await Attendance.aggregate([
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$date" }
+          }
+        }
+      },
+      {
+        $sort: { _id: -1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: dates.length,
+      data: dates.map(d => d._id)
+    });
+  } catch (error) {
+    next(error);
+  }
 };

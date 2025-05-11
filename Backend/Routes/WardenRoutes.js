@@ -2,7 +2,6 @@ import express from "express"
 import {
   getProfile,
   updateProfile,
-  getStudents,
   getRooms,
   getComplaints,
   updateComplaintStatus,
@@ -17,6 +16,11 @@ import {
   getNotices,
   updateMessMenu,
   getMessDetails,
+  createStudent,
+  getAllStudents,
+  getStudentById,
+  updateStudent,
+  deleteStudent,
 } from "../Controllers/WardenController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -31,7 +35,11 @@ router.get("/profile", getProfile)
 router.put("/profile", updateProfile)
 
 // Student routes
-router.get("/students", getStudents)
+router.post("/students", createStudent)
+router.get("/students", getAllStudents)
+router.get("/students/:id", getStudentById)
+router.put("/students/:id", updateStudent)
+router.delete("/students/:id", deleteStudent);
 
 // Room routes
 router.get("/rooms", getRooms)
