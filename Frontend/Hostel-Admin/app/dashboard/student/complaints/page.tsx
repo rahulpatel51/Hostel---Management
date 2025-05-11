@@ -5,34 +5,36 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, XCircle, MessageSquare, PlusCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, XCircle, MessageSquare, PlusCircle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Complaint = {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   category: string;
-  status: 'pending' | 'in-progress' | 'resolved' | 'rejected';
+  status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  roomNumber: string;
+  submittedBy: string;
+  assignedTo?: string;
+  images?: string[];
+  comments?: {
+    _id: string;
+    text: string;
+   timestamp: string;
+    author: { name: string };
+  }[];
+  response?: string;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt?: string;
-  response?: string;
-  comments?: {
-    id: string;
-    text: string;
-    createdAt: string;
-    author: string;
-  }[];
+  resolvedAt?: string;
 };
 
 export default function StudentComplaintsPage() {
@@ -43,94 +45,70 @@ export default function StudentComplaintsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
-  // Form state
   const [newComplaint, setNewComplaint] = useState({
     title: '',
     description: '',
-    category: 'Maintenance'
+    category: 'Maintenance',
+    roomNumber: ''
   });
 
-  const categories = ['Maintenance', 'Furniture', 'Internet', 'Housekeeping', 'Electrical', 'Other'];
+  const categories = ['Maintenance', 'Cleanliness', 'Food', 'Security', 'Other'];
+  const priorities = ['Low', 'Medium', 'High', 'Urgent'];
 
   useEffect(() => {
-    const fetchComplaints = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('http://localhost:5000/api/student/complaints', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch complaints');
-        }
-        
-        const data = await response.json();
-        
-        // Handle different response structures
-        const complaintsArray = Array.isArray(data) 
-          ? data 
-          : data.data || data.complaints || [];
-        
-        if (!Array.isArray(complaintsArray)) {
-          throw new Error('Invalid data format received from server');
-        }
-
-        setComplaints(complaintsArray);
-      } catch (error: any) {
-        console.error('Fetch error:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to load complaints",
-          variant: "destructive"
-        });
-        setComplaints([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchComplaints();
-  }, [toast]);
+  }, []);
 
-  const fetchComplaintDetails = async (id: string) => {
+  const fetchComplaints = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/student/complaints/${id}`, {
+      const response = await fetch('http://localhost:5000/api/student/complaints', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch complaint details');
+        throw new Error(errorData.message || 'Failed to fetch complaints');
       }
-      
+
       const data = await response.json();
-      setSelectedComplaint(data);
+      
+      // Ensure we're working with an array
+      const complaintsArray = Array.isArray(data) 
+        ? data 
+        : data.data || data.complaints || [];
+      
+      if (!Array.isArray(complaintsArray)) {
+        throw new Error('Invalid data format received from server');
+      }
+
+      setComplaints(complaintsArray);
     } catch (error: any) {
-      console.error('Error fetching details:', error);
+      console.error('Fetch error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load complaint details",
+        description: error.message || "Failed to load complaints",
         variant: "destructive"
       });
+      setComplaints([]); // Set to empty array instead of null/undefined
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSubmitComplaint = async () => {
-    if (!newComplaint.title.trim() || !newComplaint.description.trim()) {
+    if (!newComplaint.title.trim() || !newComplaint.description.trim() || !newComplaint.roomNumber.trim()) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000
       });
       return;
     }
@@ -144,42 +122,43 @@ export default function StudentComplaintsPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          title: newComplaint.title,
-          description: newComplaint.description,
-          category: newComplaint.category
+          ...newComplaint,
+          priority: 'medium' // Default priority
         })
       });
-      
-      const responseData = await response.json();
-      
+
       if (!response.ok) {
-        // Handle server-side validation errors
-        if (response.status === 400 || response.status === 422) {
-          throw new Error(responseData.message || 'Validation failed');
-        }
-        throw new Error(responseData.message || `Server error: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit complaint');
       }
+
+      const data = await response.json();
       
-      setComplaints(prev => [responseData, ...prev]);
+      // Show success toast
       toast({
-        title: "Success",
-        description: "Complaint submitted successfully",
-        variant: "default"
+        title: "Success!",
+        description: "Your complaint has been submitted successfully",
+        duration: 3000
       });
       
-      // Reset form
+      // Reset form and close dialog
       setNewComplaint({
         title: '',
         description: '',
-        category: 'Maintenance'
+        category: 'Maintenance',
+        roomNumber: ''
       });
       setIsDialogOpen(false);
+      
+      // Refresh the complaints list
+      await fetchComplaints();
     } catch (error: any) {
       console.error('Submission error:', error);
       toast({
         title: "Submission Failed",
         description: error.message || "Failed to submit complaint",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000
       });
     } finally {
       setIsSubmitting(false);
@@ -191,128 +170,156 @@ export default function StudentComplaintsPage() {
       toast({
         title: "Validation Error",
         description: "Please enter a comment",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000
       });
       return;
     }
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/student/complaints/${selectedComplaint.id}/comments`,
+        `http://localhost:5000/api/student/complaints/${selectedComplaint._id}/comments`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({
-            text: newComment
-          })
+          body: JSON.stringify({ text: newComment })
         }
       );
-      
-      const responseData = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(responseData.message || `Server error: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add comment');
       }
-      
-      // Update the selected complaint with new comments
-      setSelectedComplaint(responseData);
+
+      const data = await response.json();
+      setSelectedComplaint(data);
       setNewComment('');
       
       toast({
-        title: "Success",
-        description: "Comment added successfully",
-        variant: "default"
+        title: "Comment Added",
+        description: "Your comment has been added successfully",
+        duration: 3000
       });
     } catch (error: any) {
       console.error('Comment error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to add comment",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000
       });
     }
   };
 
   const getStatusBadge = (status: Complaint['status']) => {
+    const baseClasses = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium";
+    
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary" className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          Pending
-        </Badge>;
-      case 'in-progress':
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          In Progress
-        </Badge>;
+        return (
+          <Badge className={`${baseClasses} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}>
+            <Clock className="h-3 w-3" /> Pending
+          </Badge>
+        );
+      case 'in_progress':
+        return (
+          <Badge className={`${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200`}>
+            <AlertCircle className="h-3 w-3" /> In Progress
+          </Badge>
+        );
       case 'resolved':
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3" />
-          Resolved
-        </Badge>;
+        return (
+          <Badge className={`${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200`}>
+            <CheckCircle2 className="h-3 w-3" /> Resolved
+          </Badge>
+        );
       case 'rejected':
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 flex items-center gap-1">
-          <XCircle className="h-3 w-3" />
-          Rejected
-        </Badge>;
+        return (
+          <Badge className={`${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200`}>
+            <XCircle className="h-3 w-3" /> Rejected
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return dateString;
+    }
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex flex-col gap-6">
-        <div className="flex justify-between items-center">
+    <div className="container mx-auto py-8 px-4">
+      <div className="flex flex-col gap-8">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">My Complaints</h1>
-            <p className="text-muted-foreground">Submit and track your hostel complaints</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Complaints</h1>
+            <p className="text-gray-600 dark:text-gray-400">Submit and track your hostel complaints</p>
           </div>
+          
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 New Complaint
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Submit New Complaint</DialogTitle>
+                <DialogTitle className="text-xl">Submit New Complaint</DialogTitle>
+                <DialogDescription>
+                  Fill out the form below to submit a new complaint
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Title <span className="text-red-500">*</span>
                   </label>
                   <Input
                     placeholder="Brief description of the issue"
                     value={newComplaint.title}
                     onChange={(e) => setNewComplaint({...newComplaint, title: e.target.value})}
+                    className="border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
                   />
                 </div>
+                
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Room Number <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="Your room number"
+                    value={newComplaint.roomNumber}
+                    onChange={(e) => setNewComplaint({...newComplaint, roomNumber: e.target.value})}
+                    className="border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Category <span className="text-red-500">*</span>
                   </label>
                   <Select 
                     value={newComplaint.category} 
                     onValueChange={(value) => setNewComplaint({...newComplaint, category: value})}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-gray-300 dark:border-gray-600 focus:ring-indigo-500">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -322,30 +329,40 @@ export default function StudentComplaintsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Description <span className="text-red-500">*</span>
                   </label>
                   <Textarea
-                    placeholder="Provide detailed information..."
+                    placeholder="Provide detailed information about your complaint..."
                     rows={5}
                     value={newComplaint.description}
                     onChange={(e) => setNewComplaint({...newComplaint, description: e.target.value})}
+                    className="border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
                   />
                 </div>
+                
                 <div className="flex justify-end gap-2 mt-4">
                   <Button 
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
                     disabled={isSubmitting}
+                    className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     Cancel
                   </Button>
                   <Button 
                     onClick={handleSubmitComplaint}
-                    disabled={isSubmitting || !newComplaint.title.trim() || !newComplaint.description.trim()}
+                    disabled={isSubmitting || !newComplaint.title.trim() || !newComplaint.description.trim() || !newComplaint.roomNumber.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
                   >
-                    {isSubmitting ? "Submitting..." : "Submit"}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : "Submit Complaint"}
                   </Button>
                 </div>
               </div>
@@ -353,64 +370,81 @@ export default function StudentComplaintsPage() {
           </Dialog>
         </div>
 
-        <Card>
-          <CardHeader className="bg-muted/50">
+        {/* Complaints Table */}
+        <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
+          <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
-              <MessageSquare className="h-6 w-6 text-primary" />
-              <CardTitle>Your Complaints</CardTitle>
+              <MessageSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <CardTitle className="text-xl">Your Complaints</CardTitle>
             </div>
           </CardHeader>
+          
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              <div className="space-y-4 p-6">
+                {[...Array(5)].map((_, i) => (
+                  <div key={`skeleton-${i}`} className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : complaints.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
-                <MessageSquare className="h-8 w-8" />
-                <p>No complaints found</p>
-                <Button onClick={() => setIsDialogOpen(true)}>
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <MessageSquare className="h-10 w-10 text-gray-400 dark:text-gray-500" />
+                <p className="text-lg text-gray-600 dark:text-gray-400">No complaints found</p>
+                <Button 
+                  onClick={() => setIsDialogOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Submit a Complaint
                 </Button>
               </div>
             ) : (
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader className="bg-gray-50 dark:bg-gray-800">
                   <TableRow>
-                    <TableHead className="w-[200px]">Complaint</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead className="text-right">Updated</TableHead>
+                    <TableHead className="w-[200px] text-gray-700 dark:text-gray-300">Complaint</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Room</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Category</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Status</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Submitted</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {complaints.map((complaint) => (
                     <TableRow 
-                      key={complaint.id} 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => fetchComplaintDetails(complaint.id)}
+                      key={complaint._id} 
+                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      onClick={() => setSelectedComplaint(complaint)}
                     >
                       <TableCell>
                         <div className="space-y-1">
-                          <p className="font-medium">{complaint.title}</p>
-                          <p className="text-sm text-muted-foreground line-clamp-1">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {complaint.title}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
                             {complaint.description}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{complaint.category}</Badge>
+                        <Badge variant="outline">{complaint.roomNumber}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-gray-700 dark:text-gray-300">
+                          {complaint.category}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(complaint.status)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm text-gray-600 dark:text-gray-400">
                         {formatDate(complaint.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {complaint.updatedAt ? formatDate(complaint.updatedAt) : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -420,80 +454,88 @@ export default function StudentComplaintsPage() {
           </CardContent>
         </Card>
 
-        {selectedComplaint && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold">Complaint Details</h2>
-            <Card>
-              <CardHeader className="border-b">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>{selectedComplaint.title}</CardTitle>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline">{selectedComplaint.category}</Badge>
-                      {getStatusBadge(selectedComplaint.status)}
-                    </div>
+        {/* Complaint Details Dialog */}
+        <Dialog open={!!selectedComplaint} onOpenChange={(open) => !open && setSelectedComplaint(null)}>
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+            {selectedComplaint && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl">{selectedComplaint.title}</DialogTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline">{selectedComplaint.roomNumber}</Badge>
+                    <Badge variant="outline">{selectedComplaint.category}</Badge>
+                    {getStatusBadge(selectedComplaint.status)}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Submitted: {formatDate(selectedComplaint.createdAt)}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2">Description</h3>
-                  <p className="text-muted-foreground">{selectedComplaint.description}</p>
-                </div>
+                </DialogHeader>
                 
-                {selectedComplaint.response && (
-                  <div>
-                    <h3 className="font-medium mb-2">
-                      {selectedComplaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution'}
-                    </h3>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <p>{selectedComplaint.response}</p>
-                    </div>
+                <div className="space-y-6 pt-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium text-lg">Description</h3>
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {selectedComplaint.description}
+                    </p>
                   </div>
-                )}
-                
-                {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
-                  <div>
-                    <h3 className="font-medium mb-2">Comments</h3>
-                    <div className="space-y-3">
-                      {selectedComplaint.comments.map((comment) => (
-                        <div key={comment.id} className="bg-muted p-4 rounded-lg">
-                          <div className="flex justify-between">
-                            <p className="font-medium">{comment.author}</p>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDate(comment.createdAt)}
-                            </span>
+                  
+                  {selectedComplaint.response && (
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-lg">
+                        {selectedComplaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution'}
+                      </h3>
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 whitespace-pre-line">
+                        {selectedComplaint.response}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-lg">Comments</h3>
+                      <div className="space-y-3">
+                        {selectedComplaint.comments.map((comment) => (
+                          <div 
+                            key={comment._id} 
+                            className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+                          >
+                            <div className="flex justify-between">
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {comment.author?.name || 'Unknown'}
+                              </p>
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {formatDate(comment.timestamp)}
+                              </span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
+                              {comment.text}
+                            </p>
                           </div>
-                          <p className="mt-2">{comment.text}</p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <h3 className="font-medium text-lg">Add Comment</h3>
+                    <div className="flex gap-2">
+                      <Textarea
+                        placeholder="Add your comment here..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        className="flex-1 border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
+                      />
+                      <Button 
+                        onClick={handleSubmitComment}
+                        disabled={!newComment.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                      >
+                        Submit
+                      </Button>
                     </div>
                   </div>
-                )}
-                
-                <div className="pt-4">
-                  <h3 className="font-medium mb-2">Add Comment</h3>
-                  <div className="flex gap-2">
-                    <Textarea
-                      placeholder="Type your comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                    />
-                    <Button 
-                      onClick={handleSubmitComment}
-                      disabled={!newComment.trim()}
-                    >
-                      Submit
-                    </Button>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

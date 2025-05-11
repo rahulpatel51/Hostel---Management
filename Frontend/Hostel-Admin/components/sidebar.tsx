@@ -39,7 +39,6 @@ export function Sidebar({ role }: SidebarProps) {
   const studentLinks = [
     { name: "Dashboard", href: "/dashboard/student", icon: Home },
     { name: "Room Details", href: "/dashboard/student/room", icon: BedDouble },
-    { name: "Academics", href: "/dashboard/student/academics", icon: Book },
     { name: "Attendance", href: "/dashboard/student/attendance", icon: Clock },
     { name: "Fee Payment", href: "/dashboard/student/fees", icon: CreditCard },
     { name: "Mess Menu", href: "/dashboard/student/mess", icon: Utensils },
