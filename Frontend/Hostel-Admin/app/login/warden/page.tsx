@@ -33,49 +33,30 @@ export default function WardenLoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        }),
-        credentials: "include"
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed")
-      }
-
-      // Store token if using localStorage
-      if (data.token) {
-        localStorage.setItem("token", data.token)
-      }
-
-      // Redirect based on user role
-      if (data.user?.role === "warden") {
-        router.push("/dashboard/warden")
-      } else {
-        toast({
-          title: "Access Denied",
-          description: "This portal is for wardens only",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
+    // Simulate loading
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Check if fields are filled
+    if (!formData.email || !formData.password) {
       toast({
         title: "Login Failed",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description: "Please fill in all fields",
         variant: "destructive"
       })
-    } finally {
       setIsLoading(false)
+      return
     }
+
+    // Any email/password will work
+    localStorage.setItem("token", "simulated-token-for-warden-access")
+    
+    toast({
+      title: "Login Successful",
+      description: "Welcome to the Warden Dashboard",
+    })
+    
+    router.push("/dashboard/warden")
+    setIsLoading(false)
   }
 
   return (
@@ -101,7 +82,7 @@ export default function WardenLoginPage() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">of Institutions</p>
               </div>
             </Link>
-            
+
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2 text-xs bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 px-3 py-1.5 rounded-full border border-teal-200 dark:border-teal-800">
                 <ShieldCheck className="h-3.5 w-3.5" />

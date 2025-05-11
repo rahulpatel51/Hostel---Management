@@ -13,7 +13,7 @@ import studentRoutes from "./Routes/StudentRoutes.js";
 import wardenRoutes from "./Routes/WardenRoutes.js";
 import roomRoutes from "./Routes/RoomRoutes.js";
 import noticeRoutes from "./Routes/NoticeRoutes.js";
-import messRoutes from "./Routes/MessRoutes.js";
+import messRoutes from "./Routes/MenuRoutes.js";
 
 dotenv.config();
 
@@ -48,7 +48,7 @@ app.use("/api/student", studentRoutes);
 app.use("/api/warden", wardenRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/notices", noticeRoutes);
-app.use("/api/mess", messRoutes);
+app.use("/api/menu", messRoutes);
 
 // Default route
 app.get("/", (req, res) => {

@@ -45,10 +45,10 @@ export const registerAdmin = async (req, res, next) => {
   }
 }
 
-// Login user (email + password only)
+// Login user (email + password only) with role verification
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body
+    const { email, password, role } = req.body
 
     if (!email || !password) {
       return res.status(400).json({
@@ -57,6 +57,7 @@ export const login = async (req, res, next) => {
       })
     }
 
+    // Find user by email and select password
     const user = await User.findOne({ email }).select("+password")
 
     if (!user || !(await user.comparePassword(password))) {
@@ -66,6 +67,23 @@ export const login = async (req, res, next) => {
       })
     }
 
+    // Check if the user's role matches the requested role (if provided)
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied. This account is not a ${role}`,
+      })
+    }
+
+    // Additional check to prevent students/wardens from using admin credentials
+    if (user.role === "admin" && user.adminCode !== "226028") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access denied",
+      })
+    }
+
+    // Update last login time
     user.lastLogin = Date.now()
     await user.save()
 
@@ -155,7 +173,10 @@ export const updateProfile = async (req, res, next) => {
       updateData.profilePicture = profilePicture
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true, runValidators: true }).select("-password")
+    const user = await User.findByIdAndUpdate(req.user.id, updateData, { 
+      new: true, 
+      runValidators: true 
+    }).select("-password")
 
     res.status(200).json({
       success: true,

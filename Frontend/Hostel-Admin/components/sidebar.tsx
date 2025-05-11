@@ -69,7 +69,7 @@ export function Sidebar({ role }: SidebarProps) {
   const wardenLinks = [
     { name: "Dashboard", href: "/dashboard/warden", icon: Home },
     { name: "Student Management", href: "/dashboard/warden/students", icon: Users },
-    { name: "Room Allocation", href: "/dashboard/warden/rooms", icon: BedDouble },
+    { name: "Room Management", href: "/dashboard/warden/rooms", icon: BedDouble },
     { name: "Leave Approvals", href: "/dashboard/warden/leave", icon: Calendar },
     { name: "Attendance", href: "/dashboard/warden/attendance", icon: ClipboardCheck },
     { name: "Complaints", href: "/dashboard/warden/complaints", icon: MessageSquare },

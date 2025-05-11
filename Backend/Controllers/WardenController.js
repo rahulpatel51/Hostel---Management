@@ -6,7 +6,7 @@ import Leave from "../Models/Leave.js"
 import Attendance from "../Models/Attendance.js"
 import Discipline from "../Models/Discipline.js"
 import Notice from "../Models/Notice.js"
-import Mess from "../Models/Mess.js"
+import Mess from "../Models/Menu.js"
 import { uploadMultipleImages } from "../Config/cloudinary.js"
 
 // Get warden profile

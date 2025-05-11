@@ -10,24 +10,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-type MenuItem = {
-  id: string;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+interface Review {
+  _id: string;
+  userId: string | { _id: string };
+  userName: string;
+  profilePicture: string;
+  avatar: string;
+  comment: string;
+  rating: number;
+  createdAt: string;
+}
+
+interface MenuItem {
+  _id: string;
   day: string;
   date: string;
   breakfast: string;
   lunch: string;
   snacks: string;
   dinner: string;
-  rating: number;
-  reviews: {
-    studentId: string;
-    studentName: string;
-    avatar: string;
-    comment: string;
-    rating: number;
-    date: string;
-  }[];
-};
+  averageRating: number;
+  reviews: Review[];
+}
 
 export default function StudentMessMenuPage() {
   const { toast } = useToast();
@@ -35,11 +41,11 @@ export default function StudentMessMenuPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [currentDay, setCurrentDay] = useState<MenuItem | null>(null);
+  const [currentMenuItem, setCurrentMenuItem] = useState<MenuItem | null>(null);
   const [studentRating, setStudentRating] = useState(0);
   const [studentComment, setStudentComment] = useState('');
 
-  // Get current day name
+  // Current day and date
   const currentDate = new Date();
   const currentDayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
   const formattedDate = currentDate.toLocaleDateString('en-US', { 
@@ -48,58 +54,46 @@ export default function StudentMessMenuPage() {
     day: 'numeric' 
   });
 
-  // Mock student data
+  // Mock current student data
   const currentStudent = {
     id: 'STU12345',
     name: 'Rahul Sharma',
     avatar: 'https://randomuser.me/api/portraits/men/1.jpg'
   };
 
+  // Meal types configuration
+  const mealTypes = [
+    { icon: '🍳', title: 'Breakfast', key: 'breakfast' },
+    { icon: '🍲', title: 'Lunch', key: 'lunch' },
+    { icon: '☕', title: 'Snacks', key: 'snacks' },
+    { icon: '🍛', title: 'Dinner', key: 'dinner' }
+  ];
+
+  // Fetch menu data from backend
   useEffect(() => {
     const fetchMenuData = async () => {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Generate dates for the current week
-        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const today = new Date();
-        const currentDayIndex = today.getDay();
-        
-        const mockMenuItems: MenuItem[] = daysOfWeek.map((day, index) => {
-          // Calculate date for each day of the week
-          const date = new Date(today);
-          date.setDate(today.getDate() + (index - currentDayIndex));
-          
-          return {
-            id: `MENU${index + 1}`,
-            day,
-            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            breakfast: `${index % 2 === 0 ? 'Poha' : 'Sandwich'}, ${index % 3 === 0 ? 'Tea' : 'Juice'}, Fruits`,
-            lunch: `${index % 2 === 0 ? 'Dal' : 'Rajma'}, Rice, Roti, ${index % 3 === 0 ? 'Vegetables' : 'Curd'}, Salad`,
-            snacks: `${index % 2 === 0 ? 'Samosa' : 'Pakora'} with ${index % 3 === 0 ? 'Tea' : 'Coffee'}`,
-            dinner: `${index % 2 === 0 ? 'Chicken Curry' : 'Paneer'}, Rice, Roti, ${index % 3 === 0 ? 'Soup' : 'Raita'}`,
-            rating: Math.round((3.5 + Math.random() * 1.5) * 10) / 10,
-            reviews: [
-              {
-                studentId: `STU${index}01`,
-                studentName: ['Rahul', 'Priya', 'Amit', 'Neha', 'Vikram', 'Anjali', 'Suresh'][index],
-                avatar: `https://randomuser.me/api/portraits/${index % 2 === 0 ? 'men' : 'women'}/${index + 1}.jpg`,
-                comment: ['Great food!', 'Could be better', 'Loved the dinner', 'Snacks were cold', 'Excellent taste'][index % 5],
-                rating: Math.floor(3 + Math.random() * 3),
-                date: new Date(Date.now() - (index * 86400000)).toLocaleDateString()
-              }
-            ]
-          };
-        });
-
-        setMenuItems(mockMenuItems);
+        const response = await fetch(`${API_BASE_URL}/menu`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch menu data');
+        }
+        const data = await response.json();
+        const processedData = data.data.map((item: MenuItem) => ({
+          ...item,
+          reviews: item.reviews?.map(review => ({
+            ...review,
+            userId: typeof review.userId === 'object' && review.userId !== null ? review.userId._id : review.userId
+          })) || []
+        }));
+        setMenuItems(processedData);
       } catch (error) {
         toast({
           title: "Error",
           description: "Failed to load mess menu",
           variant: "destructive"
         });
+        console.error("Error fetching menu data:", error);
       } finally {
         setIsLoading(false);
       }
@@ -112,9 +106,11 @@ export default function StudentMessMenuPage() {
     setExpandedDay(expandedDay === dayId ? null : dayId);
   };
 
-  const openFeedbackDialog = (item: MenuItem) => {
-    setCurrentDay(item);
-    const existingReview = item.reviews.find(review => review.studentId === currentStudent.id);
+  const openFeedbackDialog = (menuItem: MenuItem) => {
+    setCurrentMenuItem(menuItem);
+    const existingReview = menuItem.reviews.find(review => 
+      review.userId.toString() === currentStudent.id.toString()
+    );
     if (existingReview) {
       setStudentRating(existingReview.rating);
       setStudentComment(existingReview.comment);
@@ -129,53 +125,59 @@ export default function StudentMessMenuPage() {
     setStudentRating(rating);
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
+    if (!currentMenuItem) return;
+    
     setIsLoading(true);
     try {
-      setTimeout(() => {
-        if (!currentDay) return;
-        
-        const updatedItems = menuItems.map(item => {
-          if (item.id === currentDay.id) {
-            const filteredReviews = item.reviews.filter(review => review.studentId !== currentStudent.id);
-            const newReview = {
-              studentId: currentStudent.id,
-              studentName: currentStudent.name,
-              avatar: currentStudent.avatar,
-              comment: studentComment,
-              rating: studentRating,
-              date: new Date().toLocaleDateString()
-            };
-            
-            const allRatings = [...filteredReviews, newReview].map(r => r.rating);
-            const avgRating = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
-            
-            return {
-              ...item,
-              rating: parseFloat(avgRating.toFixed(1)),
-              reviews: [...filteredReviews, newReview]
-            };
-          }
-          return item;
-        });
-        
-        setMenuItems(updatedItems);
-        
-        toast({
-          title: "Thank you!",
-          description: "Your feedback has been submitted",
-          className: "bg-green-500 text-white border-0"
-        });
-        
-        setIsFeedbackOpen(false);
-        setIsLoading(false);
-      }, 500);
+      const token = localStorage.getItem('token') || '';
+      
+      const response = await fetch(`${API_BASE_URL}/menu/${currentMenuItem._id}/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          comment: studentComment,
+          rating: studentRating
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit feedback');
+      }
+
+      const updatedData = await response.json();
+      
+      setMenuItems(prevItems => 
+        prevItems.map(item => 
+          item._id === currentMenuItem._id 
+            ? {
+                ...item,
+                reviews: updatedData.data.reviews,
+                averageRating: updatedData.data.averageRating
+              }
+            : item
+        )
+      );
+
+      toast({
+        title: "Thank you!",
+        description: "Your feedback has been submitted",
+        className: "bg-green-500 text-white border-0"
+      });
+      
+      setIsFeedbackOpen(false);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to submit feedback",
+        description: error instanceof Error ? error.message : "Failed to submit feedback",
         variant: "destructive"
       });
+      console.error("Error submitting feedback:", error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -185,10 +187,10 @@ export default function StudentMessMenuPage() {
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star 
-            key={star}
+            key={`star-${star}`}
             className={`h-5 w-5 ${
-              star <= Math.round(rating) 
-                ? 'fill-blue-500 text-blue-500' 
+              star <= rating 
+                ? 'fill-yellow-400 text-yellow-400' 
                 : 'text-gray-300'
             } ${
               interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''
@@ -196,7 +198,6 @@ export default function StudentMessMenuPage() {
             onClick={() => interactive && handleRatingChange(star)}
           />
         ))}
-        <span className="text-sm ml-1 font-medium">{rating.toFixed(1)}</span>
       </div>
     );
   };
@@ -223,163 +224,172 @@ export default function StudentMessMenuPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {menuItems.map((item) => (
-            <Card 
-              key={item.id}
-              className={`transition-all duration-200 overflow-hidden ${
-                item.day === currentDayName 
-                  ? 'border-2 border-blue-500 dark:border-blue-400 shadow-lg' 
-                  : 'border border-gray-200 dark:border-gray-700'
-              } ${
-                expandedDay === item.id ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/70'
-              }`}
-            >
-              <CardHeader 
-                className={`pb-3 cursor-pointer ${expandedDay === item.id ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
-                onClick={() => toggleExpand(item.id)}
+          {menuItems.map((item) => {
+            const isToday = item.day === currentDayName;
+            const hasSubmittedFeedback = item.reviews.some(
+              review => review.userId.toString() === currentStudent.id.toString()
+            );
+            
+            return (
+              <Card 
+                key={`menu-${item._id}`}
+                className={`transition-all duration-200 overflow-hidden ${
+                  isToday
+                    ? 'border-2 border-blue-500 dark:border-blue-400 shadow-lg' 
+                    : 'border border-gray-200 dark:border-gray-700'
+                } ${
+                  expandedDay === item._id ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/70'
+                }`}
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {item.day}
-                      {item.day === currentDayName && (
-                        <Badge className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                          Today
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                      {item.date}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-blue-500 text-blue-500" />
-                    <span className="text-sm font-medium">{item.rating.toFixed(1)}</span>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="p-0">
-                {expandedDay === item.id ? (
-                  <div className="p-6 pt-0 space-y-6">
-                    <div className="grid grid-cols-1 gap-4">
-                      {[
-                        { icon: '🍳', title: 'Breakfast', content: item.breakfast },
-                        { icon: '🍲', title: 'Lunch', content: item.lunch },
-                        { icon: '☕', title: 'Snacks', content: item.snacks },
-                        { icon: '🍛', title: 'Dinner', content: item.dinner }
-                      ].map((meal, idx) => (
-                        <div key={idx} className="space-y-2">
-                          <h3 className="font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                            <span className="text-lg">{meal.icon}</span> {meal.title}
-                          </h3>
-                          <p className="text-sm whitespace-pre-line text-gray-600 dark:text-gray-400 pl-7">
-                            {meal.content}
-                          </p>
-                        </div>
-                      ))}
+                <CardHeader 
+                  className={`pb-3 cursor-pointer ${expandedDay === item._id ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
+                  onClick={() => toggleExpand(item._id)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {item.day}
+                        {isToday && (
+                          <Badge className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                            Today
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {item.date}
+                      </CardDescription>
                     </div>
-
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          Student Feedback
-                        </h3>
-                        <Button 
-                          size="sm" 
-                          onClick={() => openFeedbackDialog(item)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          {item.reviews.some(r => r.studentId === currentStudent.id) 
-                            ? 'Edit Feedback' 
-                            : 'Add Feedback'}
-                        </Button>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm font-medium">{item.averageRating?.toFixed(1) || '0.0'}</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="p-0">
+                  {expandedDay === item._id ? (
+                    <div className="p-6 pt-0 space-y-6">
+                      <div className="grid grid-cols-1 gap-4">
+                        {mealTypes.map((meal) => (
+                          <div key={`${item._id}-${meal.key}`} className="space-y-2">
+                            <h3 className="font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                              <span className="text-lg">{meal.icon}</span> {meal.title}
+                            </h3>
+                            <p className="text-sm whitespace-pre-line text-gray-600 dark:text-gray-400 pl-7">
+                              {item[meal.key as keyof MenuItem]}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                      {item.reviews.length > 0 ? (
-                        <div className="space-y-3">
-                          {item.reviews.map((review, index) => (
-                            <div key={index} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/30">
-                              <div className="flex justify-between items-start">
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            Student Feedback
+                          </h3>
+                          {isToday && !hasSubmittedFeedback && (
+                            <Button 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openFeedbackDialog(item);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <MessageSquare className="mr-2 h-4 w-4" />
+                              Add Feedback
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {item.reviews.length > 0 ? (
+                          <div className="space-y-4">
+                            {item.reviews.map((review) => (
+                              <div key={`review-${review._id}`} className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30">
                                 <div className="flex items-center gap-3">
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarImage src={review.avatar} alt={review.studentName} />
-                                    <AvatarFallback>{review.studentName.charAt(0)}</AvatarFallback>
+                                  <Avatar className="h-9 w-9">
+                                    <AvatarImage src={review.avatar} alt={review.userName} />
+                                    <AvatarFallback>{(review.userName || 'U').charAt(0)}</AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <p className="font-medium text-gray-900 dark:text-white">{review.studentName}</p>
-                                    <p className="text-xs text-muted-foreground">{review.date}</p>
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                      <p className="font-medium text-gray-900 dark:text-white">{review.userName || 'Unknown'}</p>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {new Date(review.createdAt).toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                    {review.comment && (
+                                      <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">
+                                        {review.comment}
+                                      </p>
+                                    )}
+                                    <div className="mt-3">
+                                      {renderStars(review.rating)}
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star 
-                                      key={star}
-                                      className={`h-3 w-3 ${
-                                        star <= review.rating 
-                                          ? 'fill-blue-500 text-blue-500' 
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
                               </div>
-                              {review.comment && (
-                                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 pl-11">
-                                  {review.comment}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-muted-foreground">
-                          <p>No reviews yet</p>
-                          <p className="text-xs mt-1">Be the first to review!</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="px-6 pb-4">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-start gap-2">
-                        <span className="text-gray-500 dark:text-gray-400">🍳</span>
-                        <p className="line-clamp-2 text-gray-700 dark:text-gray-300">{item.breakfast}</p>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-gray-500 dark:text-gray-400">🍲</span>
-                        <p className="line-clamp-2 text-gray-700 dark:text-gray-300">{item.lunch}</p>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-muted-foreground">
+                            <p>No reviews yet</p>
+                            {isToday && !hasSubmittedFeedback && (
+                              <p className="text-xs mt-1">Be the first to review!</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex justify-center mt-4">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                        onClick={() => toggleExpand(item.id)}
-                      >
-                        View full menu
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      </Button>
+                  ) : (
+                    <div className="px-6 pb-4">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-start gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">🍳</span>
+                          <p className="line-clamp-2 text-gray-700 dark:text-gray-300">{item.breakfast}</p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">🍲</span>
+                          <p className="line-clamp-2 text-gray-700 dark:text-gray-300">{item.lunch}</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-center mt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(item._id);
+                          }}
+                        >
+                          View full menu
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Feedback Dialog */}
       <Dialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="text-blue-600 dark:text-blue-400">
-              {currentDay?.day} Meal Feedback
+              {currentMenuItem?.day} Meal Feedback
             </DialogTitle>
             <DialogDescription>
-              Share your experience about the meals
+              Share your experience about today's meals
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">

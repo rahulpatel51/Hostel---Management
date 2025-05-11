@@ -66,6 +66,9 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
+
+
+
 // Submit complaint
 export const submitComplaint = async (req, res, next) => {
   try {
@@ -183,6 +186,9 @@ export const addCommentToComplaint = async (req, res, next) => {
     next(error)
   }
 }
+
+
+
 
 // Apply for leave
 export const applyForLeave = async (req, res, next) => {

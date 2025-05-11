@@ -220,8 +220,8 @@ export default function AdminLoginPage() {
               
               <div className="text-center text-sm text-gray-600 dark:text-gray-400">
                 Need admin access?{" "}
-                <Link href="/contact" className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
-                  Request credentials
+                <Link href="/signup/admin" className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
+                  Signup
                 </Link>
               </div>
               

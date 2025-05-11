@@ -1,265 +1,412 @@
 "use client"
 
-import { useState } from 'react'
+import { useRef, useState, useEffect } from "react"
+import Webcam from "react-webcam"
+import { useRouter } from 'next/navigation'
+import axios from 'axios'
+import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Download, 
-  Filter, 
-  MoreHorizontal, 
-  Search, 
-  UserPlus,
-  X,
-  ChevronDown,
-  ChevronUp,
-  Move,
-  Edit,
-  DollarSign
-} from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Download, Filter, MoreHorizontal, Search, UserPlus, X, ChevronDown, ChevronUp, Edit, DollarSign, Camera, CheckCircle, Loader2, ScanFace, Eye, EyeOff, RotateCw, Trash2 } from "lucide-react"
 
 interface Student {
-  id: string
+  _id: string
+  studentId: string
   name: string
   email: string
   phone: string
-  room: string
-  block: string
   course: string
   year: string
-  status: string
-  joinDate: string
+  status: "Active" | "Pending" | "Inactive"
+  createdAt: string;
   address: string
-  image: string
+  image?: string
+  faceId?: string
 }
 
 interface FeeRecord {
-  id: string
+  _id: string
   date: string
   amount: number
-  status: 'Paid' | 'Pending' | 'Overdue'
+  status: "Paid" | "Pending" | "Overdue"
   paymentMethod?: string
   receiptNumber?: string
 }
 
+const API_BASE_URL = 'http://localhost:5000/api/admin/students'
+
 export default function StudentManagementPage() {
+  const router = useRouter()
+  const webcamRef = useRef<Webcam>(null)
+  
+  // UI State
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [yearFilter, setYearFilter] = useState("all")
-  const [blockFilter, setBlockFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [showEditStudent, setShowEditStudent] = useState(false)
-  const [showChangeRoom, setShowChangeRoom] = useState(false)
   const [showFeeHistory, setShowFeeHistory] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Camera State
+  const [faceImage, setFaceImage] = useState<string | undefined>(undefined)
+  const [showCamera, setShowCamera] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [mirrored, setMirrored] = useState(true)
+  const [isCapturing, setIsCapturing] = useState(false)
+
+  // Data State
+  const [students, setStudents] = useState<Student[]>([])
+  const [feeRecords, setFeeRecords] = useState<Record<string, FeeRecord[]>>({})
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [editedStudent, setEditedStudent] = useState<Student | null>(null)
-  const [newBlock, setNewBlock] = useState("")
-  const [newRoom, setNewRoom] = useState("")
 
-  const students: Student[] = [
-    {
-      id: "ST2023001",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      phone: "+91 9876543210",
-      room: "A-101",
-      block: "Block A",
-      course: "Computer Science",
-      year: "2nd Year",
-      status: "Active",
-      joinDate: "15 Aug 2022",
-      address: "123 Main St, Bangalore, Karnataka",
-      image: "/avatars/01.png"
-    },
-    {
-      id: "ST2023002",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      phone: "+91 8765432109",
-      room: "B-205",
-      block: "Block B",
-      course: "Electrical Engineering",
-      year: "3rd Year",
-      status: "Active",
-      joinDate: "20 Jul 2021",
-      address: "456 Oak Ave, Mumbai, Maharashtra",
-      image: "/avatars/02.png"
-    },
-    {
-      id: "ST2023003",
-      name: "Michael Johnson",
-      email: "michael.j@example.com",
-      phone: "+91 7654321098",
-      room: "C-310",
-      block: "Block C",
-      course: "Mechanical Engineering",
-      year: "1st Year",
-      status: "Active",
-      joinDate: "05 Jun 2023",
-      address: "789 Pine Rd, Delhi",
-      image: "/avatars/03.png"
-    },
-    {
-      id: "ST2023004",
-      name: "Sarah Williams",
-      email: "sarah.w@example.com",
-      phone: "+91 6543210987",
-      room: "A-202",
-      block: "Block A",
-      course: "Civil Engineering",
-      year: "4th Year",
-      status: "Active",
-      joinDate: "10 May 2020",
-      address: "321 Elm St, Chennai, Tamil Nadu",
-      image: "/avatars/04.png"
-    },
-    {
-      id: "ST2023005",
-      name: "David Brown",
-      email: "david.b@example.com",
-      phone: "+91 5432109876",
-      room: "D-105",
-      block: "Block D",
-      course: "Business Administration",
-      year: "2nd Year",
-      status: "Pending",
-      joinDate: "Pending",
-      address: "654 Maple Dr, Hyderabad, Telangana",
-      image: "/avatars/05.png"
-    },
-    {
-      id: "ST2023006",
-      name: "Emily Davis",
-      email: "emily.d@example.com",
-      phone: "+91 4321098765",
-      room: "B-301",
-      block: "Block B",
-      course: "Medicine",
-      year: "3rd Year",
-      status: "Active",
-      joinDate: "12 Apr 2021",
-      address: "987 Cedar Ln, Kolkata, West Bengal",
-      image: "/avatars/06.png"
-    },
-  ]
-
-  const feeRecords: FeeRecord[] = [
-    {
-      id: "FEE2023001",
-      date: "15 Jan 2023",
-      amount: 25000,
-      status: "Paid",
-      paymentMethod: "Online Transfer",
-      receiptNumber: "RC2023001"
-    },
-    {
-      id: "FEE2023002",
-      date: "15 Feb 2023",
-      amount: 25000,
-      status: "Paid",
-      paymentMethod: "Cheque",
-      receiptNumber: "RC2023002"
-    },
-    {
-      id: "FEE2023003",
-      date: "15 Mar 2023",
-      amount: 25000,
-      status: "Pending"
-    },
-    {
-      id: "FEE2023004",
-      date: "15 Apr 2023",
-      amount: 25000,
-      status: "Overdue"
-    }
-  ]
-
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         student.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         student.course.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || student.status === statusFilter
-    const matchesYear = yearFilter === "all" || student.year === yearFilter
-    const matchesBlock = blockFilter === "all" || student.block === blockFilter
-    
-    return matchesSearch && matchesStatus && matchesYear && matchesBlock
+  // Form State
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    course: "",
+    year: "",
+    address: "",
+    password: "",
+    status: "Active" as "Active" | "Pending" | "Inactive",
   })
 
+  // Initialize axios with interceptors
+  const api = axios.create({
+    baseURL: API_BASE_URL,
+  })
+
+  api.interceptors.request.use(config => {
+    const token = localStorage.getItem('adminToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  })
+
+  api.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token')
+        router.push('/login')
+        showToast("Session expired", "Please login again", "destructive")
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  // Helper function for showing toast messages
+  const showToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
+    toast({
+      title,
+      description,
+      variant,
+    })
+  }
+
+  // Fetch students
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setIsLoading(true)
+        const response = await api.get('/')
+        setStudents(response.data.data)
+      } catch (error: any) {
+        showToast(
+          "Error fetching students", 
+          error.response?.data?.message || "Failed to load student data", 
+          "destructive"
+        )
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchStudents()
+  }, [])
+
+  // Filter students
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = 
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.studentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.course.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || student.status === statusFilter
+    const matchesYear = yearFilter === "all" || student.year === yearFilter
+
+    return matchesSearch && matchesStatus && matchesYear
+  })
+
+  // Form handlers
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  // Camera functions
+  const startCamera = () => {
+    setCameraError(null)
+    setIsScanning(true)
+    setShowCamera(true)
+  }
+
+  const stopCamera = () => {
+    setShowCamera(false)
+    setIsScanning(false)
+  }
+
+  const captureFace = () => {
+    if (webcamRef.current) {
+      setIsCapturing(true)
+      const imageSrc = webcamRef.current.getScreenshot()
+      if (imageSrc) {
+        setTimeout(() => {
+          setFaceImage(imageSrc)
+          setIsCapturing(false)
+          stopCamera()
+          showToast("Face captured", "Face image successfully captured")
+        }, 500)
+      } else {
+        setIsCapturing(false)
+        showToast("Capture failed", "Could not capture image", "destructive")
+      }
+    }
+  }
+
+  const retryCamera = () => {
+    setCameraError(null)
+    setIsScanning(true)
+  }
+
+  const uploadPhotoFallback = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/*"
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          showToast("File too large", "Please select an image smaller than 5MB", "destructive")
+          return
+        }
+        
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setFaceImage(event.target.result as string)
+            showToast("Image uploaded", "Face image successfully uploaded")
+          }
+        }
+        reader.onerror = () => {
+          showToast("Upload failed", "Could not read the image file", "destructive")
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+    input.click()
+  }
+
+  const removeImage = () => {
+    setFaceImage(undefined)
+    showToast("Image removed", "Face image has been removed")
+  }
+
+  // API operations
+  const fetchFeeRecords = async (studentId: string) => {
+    try {
+      const response = await api.get(`/${studentId}/fees`)
+      setFeeRecords(prev => ({ ...prev, [studentId]: response.data.data }))
+    } catch (error: any) {
+      showToast(
+        "Error fetching fee records", 
+        error.response?.data?.message || "Failed to load fee history", 
+        "destructive"
+      )
+    }
+  }
+
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      const studentData = {
+        ...formData,
+        ...(faceImage && { image: faceImage })
+      }
+
+      const response = await api.post('/', studentData)
+      setStudents([...students, response.data.data.student])
+
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        course: "",
+        year: "",
+        address: "",
+        password: "",
+        status: "Active",
+      })
+      setFaceImage(undefined)
+      setShowAddStudent(false)
+
+      showToast(
+        "Student added successfully", 
+        `${response.data.data.student.name} has been added with ID: ${response.data.data.student.studentId}`
+      )
+    } catch (error: any) {
+      showToast(
+        "Error adding student", 
+        error.response?.data?.message || "There was an error adding the student.", 
+        "destructive"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleEditStudent = (student: Student) => {
-    setEditedStudent({...student})
+    setEditedStudent(student)
+    setFormData({
+      name: student.name,
+      email: student.email,
+      phone: student.phone,
+      course: student.course,
+      year: student.year,
+      address: student.address,
+      password: "",
+      status: student.status,
+    })
+    setFaceImage(student.image)
     setShowEditStudent(true)
   }
 
-  const handleSaveStudent = () => {
-    // In a real app, you would update the student in your database/state here
-    setShowEditStudent(false)
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editedStudent) return
+
+    setIsSubmitting(true)
+
+    try {
+      const studentData = {
+        ...formData,
+        ...(faceImage && { image: faceImage })
+      }
+
+      const response = await api.put(`/${editedStudent._id}`, studentData)
+      setStudents(students.map(s => s._id === editedStudent._id ? response.data.data : s))
+
+      setShowEditStudent(false)
+      setEditedStudent(null)
+      setFaceImage(undefined)
+
+      showToast(
+        "Student updated", 
+        `${response.data.data.name}'s details have been updated.`
+      )
+    } catch (error: any) {
+      showToast(
+        "Error updating student", 
+        error.response?.data?.message || "There was an error updating the student.", 
+        "destructive"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleChangeRoom = (student: Student) => {
-    setSelectedStudent(student)
-    setNewBlock(student.block)
-    setNewRoom(student.room)
-    setShowChangeRoom(true)
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return
+
+    setIsSubmitting(true)
+
+    try {
+      await api.delete(`/${selectedStudent._id}`)
+      setStudents(students.filter(s => s._id !== selectedStudent._id))
+      setShowDeleteConfirm(false)
+      setSelectedStudent(null)
+
+      showToast(
+        "Student deleted", 
+        `${selectedStudent.name} (ID: ${selectedStudent.studentId}) has been removed.`
+      )
+    } catch (error: any) {
+      showToast(
+        "Error deleting student", 
+        error.response?.data?.message || "There was an error deleting the student.", 
+        "destructive"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleSaveRoomChange = () => {
-    // In a real app, you would update the room allocation in your database/state here
-    setShowChangeRoom(false)
-  }
-
-  const handleViewFeeHistory = (student: Student) => {
+  const handleOpenFeeHistory = (student: Student) => {
     setSelectedStudent(student)
     setShowFeeHistory(true)
+    fetchFeeRecords(student._id)
+  }
+
+  const handleCameraError = (error: string | MediaStream) => {
+    if (typeof error === 'string') {
+      setCameraError("Could not access camera. Please check permissions.")
+      setIsScanning(false)
+      showToast("Camera Error", "Could not access camera. Please check permissions.", "destructive")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-teal-600" />
+        <span className="sr-only">Loading...</span>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header Section */}
+    <div className="flex flex-col gap-6 p-4 md:p-6">
+      {/* Header */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
           Student Management
         </h1>
-        <p className="text-muted-foreground">Manage all student records, admissions, and details.</p>
+        <p className="text-muted-foreground">Manage student records, admissions, and details</p>
       </div>
 
-      {/* Search and Filter Section */}
+      {/* Controls */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              type="search"
-              placeholder="Search students by name, ID or course..."
-              className="w-full bg-white dark:bg-gray-900 pl-8 border-gray-200 dark:border-gray-800"
+              placeholder="Search students..."
+              className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -267,7 +414,7 @@ export default function StudentManagementPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2.5 top-2.5 h-5 w-5 text-muted-foreground"
+                className="absolute right-2 top-2 h-7 w-7"
                 onClick={() => setSearchQuery("")}
               >
                 <X className="h-4 w-4" />
@@ -275,52 +422,39 @@ export default function StudentManagementPage() {
             )}
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-9 gap-1"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4" />
-              <span>Filters</span>
-              {showFilters ? (
-                <ChevronUp className="h-4 w-4 ml-1" />
-              ) : (
-                <ChevronDown className="h-4 w-4 ml-1" />
-              )}
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+              {showFilters ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
             </Button>
-            <Button 
-              size="sm" 
-              className="h-9 bg-teal-600 hover:bg-teal-700 text-white"
-              onClick={() => setShowAddStudent(true)}
-            >
+            <Button onClick={() => setShowAddStudent(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Student
             </Button>
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-teal-100 dark:border-teal-900 rounded-lg bg-teal-50/50 dark:bg-teal-900/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/50">
             <div className="space-y-2">
-              <Label htmlFor="status-filter">Status</Label>
+              <Label>Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select status" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="year-filter">Year</Label>
+              <Label>Year</Label>
               <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select year" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by year" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Years</SelectItem>
@@ -331,328 +465,222 @@ export default function StudentManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="block-filter">Block</Label>
-              <Select value={blockFilter} onValueChange={setBlockFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select block" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Blocks</SelectItem>
-                  <SelectItem value="Block A">Block A</SelectItem>
-                  <SelectItem value="Block B">Block B</SelectItem>
-                  <SelectItem value="Block C">Block C</SelectItem>
-                  <SelectItem value="Block D">Block D</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         )}
       </div>
 
-      {/* Main Content */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="w-full md:w-auto grid grid-cols-4 md:inline-flex h-auto p-0 bg-transparent gap-2">
-          <TabsTrigger
-            value="all"
-            className="data-[state=active]:bg-teal-50 data-[state=active]:text-teal-900 data-[state=active]:border-teal-600 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:text-teal-400 dark:data-[state=active]:border-teal-500 border rounded-md py-2"
-          >
-            All Students
-          </TabsTrigger>
-          <TabsTrigger
-            value="active"
-            className="data-[state=active]:bg-teal-50 data-[state=active]:text-teal-900 data-[state=active]:border-teal-600 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:text-teal-400 dark:data-[state=active]:border-teal-500 border rounded-md py-2"
-          >
-            Active
-          </TabsTrigger>
-          <TabsTrigger
-            value="pending"
-            className="data-[state=active]:bg-teal-50 data-[state=active]:text-teal-900 data-[state=active]:border-teal-600 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:text-teal-400 dark:data-[state=active]:border-teal-500 border rounded-md py-2"
-          >
-            Pending
-          </TabsTrigger>
-          <TabsTrigger
-            value="alumni"
-            className="data-[state=active]:bg-teal-50 data-[state=active]:text-teal-900 data-[state=active]:border-teal-600 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:text-teal-400 dark:data-[state=active]:border-teal-500 border rounded-md py-2"
-          >
-            Alumni
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-4">
-          <Card className="border-teal-200 dark:border-teal-800">
-            <CardHeader className="p-4 flex flex-row items-center justify-between bg-teal-50/50 dark:bg-teal-900/10">
-              <div>
-                <CardTitle className="text-xl">All Students</CardTitle>
-                <CardDescription>
-                  Showing {filteredStudents.length} of {students.length} students
-                </CardDescription>
-              </div>
-              <Button variant="outline" size="sm" className="h-8 border-teal-200 dark:border-teal-700">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-teal-50/30 dark:bg-gray-900">
-                  <TableRow>
-                    <TableHead className="w-[80px]">ID</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead className="hidden md:table-cell">Room</TableHead>
-                    <TableHead className="hidden md:table-cell">Course</TableHead>
-                    <TableHead className="hidden md:table-cell">Year</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id} className="hover:bg-teal-50/30 dark:hover:bg-gray-800">
-                      <TableCell className="font-medium">{student.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarImage src={student.image} alt={student.name} />
-                            <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{student.name}</div>
-                            <div className="text-xs text-muted-foreground hidden sm:inline">
-                              {student.email}
-                            </div>
-                          </div>
+      {/* Students Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle>Students</CardTitle>
+              <CardDescription>
+                {filteredStudents.length} {filteredStudents.length === 1 ? "student" : "students"} found
+              </CardDescription>
+            </div>
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Course</TableHead>
+                <TableHead>Year</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map(student => (
+                  <TableRow key={student._id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={student.image} alt={student.name} />
+                          <AvatarFallback>
+                            {student.name.split(" ").map(n => n[0]).join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{student.name}</div>
+                          <div className="text-sm text-muted-foreground">{student.email}</div>
                         </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="font-medium">{student.room}</div>
-                        <div className="text-xs text-muted-foreground">{student.block}</div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">{student.course}</TableCell>
-                      <TableCell className="hidden md:table-cell">{student.year}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={student.status === "Active" ? "default" : "outline"}
-                          className={
-                            student.status === "Active"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
-                              : "text-amber-800 border-amber-600 dark:text-amber-400 dark:border-amber-500"
-                          }
-                        >
-                          {student.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => setSelectedStudent(student)}>
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditStudent(student)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Student
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleChangeRoom(student)}>
-                              <Move className="mr-2 h-4 w-4" />
-                              Change Room
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleViewFeeHistory(student)}>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              Fee History
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600 dark:text-red-400">
-                              {student.status === "Active" ? "Deactivate" : "Activate"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="active" className="mt-4">
-          <Card className="border-teal-200 dark:border-teal-800">
-            <CardHeader className="p-4">
-              <CardTitle className="text-xl">Active Students</CardTitle>
-              <CardDescription>Currently active students in the hostel</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <p className="text-center text-muted-foreground py-8">
-                {filteredStudents.filter(s => s.status === "Active").length} active students
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pending" className="mt-4">
-          <Card className="border-teal-200 dark:border-teal-800">
-            <CardHeader className="p-4">
-              <CardTitle className="text-xl">Pending Admissions</CardTitle>
-              <CardDescription>Students with pending hostel admission</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <p className="text-center text-muted-foreground py-8">
-                {filteredStudents.filter(s => s.status === "Pending").length} pending admissions
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="alumni" className="mt-4">
-          <Card className="border-teal-200 dark:border-teal-800">
-            <CardHeader className="p-4">
-              <CardTitle className="text-xl">Alumni</CardTitle>
-              <CardDescription>Former students who have left the hostel</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <p className="text-center text-muted-foreground py-8">
-                Alumni records will appear here
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">{student.studentId}</TableCell>
+                    <TableCell>{student.course}</TableCell>
+                    <TableCell>{student.year}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          student.status === "Active" ? "default" :
+                          student.status === "Pending" ? "secondary" : "destructive"
+                        }
+                      >
+                        {student.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(student.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditStudent(student)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenFeeHistory(student)}>
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            Fee History
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => {
+                              setSelectedStudent(student)
+                              setShowDeleteConfirm(true)
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground">No students found matching your criteria</p>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setSearchQuery("")
+                          setStatusFilter("all")
+                          setYearFilter("all")
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Add Student Dialog */}
       <Dialog open={showAddStudent} onOpenChange={setShowAddStudent}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl">Add New Student</DialogTitle>
+            <DialogDescription>
+              Fill in the student details. Face recognition is optional.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" placeholder="Enter student's full name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="Enter student's email" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" placeholder="Enter phone number" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="course">Course</Label>
-                <Input id="course" placeholder="Enter course name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="year">Year</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1st">1st Year</SelectItem>
-                    <SelectItem value="2nd">2nd Year</SelectItem>
-                    <SelectItem value="3rd">3rd Year</SelectItem>
-                    <SelectItem value="4th">4th Year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="block">Hostel Block</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select block" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A">Block A</SelectItem>
-                    <SelectItem value="B">Block B</SelectItem>
-                    <SelectItem value="C">Block C</SelectItem>
-                    <SelectItem value="D">Block D</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="room">Room Number</Label>
-                <Input id="room" placeholder="Enter room number" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea id="address" placeholder="Enter student's address" rows={3} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="photo">Upload Photo</Label>
-              <Input id="photo" type="file" accept="image/*" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowAddStudent(false)}>Cancel</Button>
-            <Button className="bg-teal-600 hover:bg-teal-700">Add Student</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Edit Student Dialog */}
-      <Dialog open={showEditStudent} onOpenChange={setShowEditStudent}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Edit Student Details</DialogTitle>
-          </DialogHeader>
-          {editedStudent && (
+          <form onSubmit={handleAddStudent}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input 
-                    value={editedStudent.name} 
-                    onChange={(e) => setEditedStudent({...editedStudent, name: e.target.value})}
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    placeholder="Student's full name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input 
-                    value={editedStudent.email} 
-                    onChange={(e) => setEditedStudent({...editedStudent, email: e.target.value})}
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="Student's email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Phone Number</Label>
-                  <Input 
-                    value={editedStudent.phone} 
-                    onChange={(e) => setEditedStudent({...editedStudent, phone: e.target.value})}
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    placeholder="Phone number"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Course</Label>
-                  <Input 
-                    value={editedStudent.course} 
-                    onChange={(e) => setEditedStudent({...editedStudent, course: e.target.value})}
+                  <Label htmlFor="password">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Create password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      required
+                      minLength={8}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-10"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="course">Course *</Label>
+                  <Input
+                    id="course"
+                    name="course"
+                    placeholder="Course name"
+                    value={formData.course}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Year</Label>
+                  <Label htmlFor="year">Year *</Label>
                   <Select 
-                    value={editedStudent.year} 
-                    onValueChange={(value) => setEditedStudent({...editedStudent, year: value})}
+                    value={formData.year} 
+                    onValueChange={(value) => handleSelectChange("year", value)} 
+                    required
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select year" />
@@ -665,11 +693,12 @@ export default function StudentManagementPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <Label htmlFor="status">Status *</Label>
                   <Select 
-                    value={editedStudent.status} 
-                    onValueChange={(value) => setEditedStudent({...editedStudent, status: value})}
+                    value={formData.status} 
+                    onValueChange={(value) => handleSelectChange("status", value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -677,254 +706,716 @@ export default function StudentManagementPage() {
                     <SelectContent>
                       <SelectItem value="Active">Active</SelectItem>
                       <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
               <div className="space-y-2">
-                <Label>Address</Label>
-                <Textarea 
-                  value={editedStudent.address} 
-                  onChange={(e) => setEditedStudent({...editedStudent, address: e.target.value})}
-                  rows={3} 
+                <Label htmlFor="address">Address *</Label>
+                <Textarea
+                  id="address"
+                  name="address"
+                  placeholder="Student's address"
+                  rows={3}
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  required
                 />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowEditStudent(false)}>
-                  Cancel
-                </Button>
-                <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSaveStudent}>
-                  Save Changes
-                </Button>
+
+              {/* Optional Face Recognition */}
+              <div className="space-y-2">
+                <Label>Face Recognition (Optional)</Label>
+                <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg bg-muted/30">
+                  {!faceImage ? (
+                    <>
+                      <div className="text-center">
+                        <ScanFace className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-2 text-sm font-medium">Add Face Recognition</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          For enhanced identification (optional)
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <Button 
+                          variant="outline" 
+                          onClick={startCamera} 
+                          disabled={isScanning}
+                        >
+                          {isScanning ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Initializing Camera
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="mr-2 h-4 w-4" />
+                              Open Camera
+                            </>
+                          )}
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={uploadPhotoFallback}
+                        >
+                          Upload Photo
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <img
+                          src={faceImage}
+                          alt="Scanned face"
+                          className="h-40 w-40 rounded-full object-cover border-4 border-teal-200"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute -top-2 -right-2 rounded-full bg-background"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Face image added</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowAddStudent(false)
+                  setFaceImage(undefined)
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Student"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+
+          {/* Camera Modal */}
+          {showCamera && (
+            <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4">
+              <div className="w-full max-w-md aspect-square bg-black rounded-lg overflow-hidden relative">
+                {cameraError ? (
+                  <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                    <div className="bg-red-100 rounded-full p-4 mb-4">
+                      <X className="h-8 w-8 text-red-600" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Camera Error</h3>
+                    <p className="text-red-300 mb-6">{cameraError}</p>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={stopCamera}
+                        className="text-white border-white/30 hover:bg-white/10"
+                      >
+                        Close
+                      </Button>
+                      <Button onClick={retryCamera}>
+                        <RotateCw className="mr-2 h-4 w-4" />
+                        Try Again
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{ 
+                        width: 720, 
+                        height: 720, 
+                        facingMode: "user",
+                        aspectRatio: 1
+                      }}
+                      mirrored={mirrored}
+                      onUserMediaError={(error) => handleCameraError(error.toString())}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="border-4 border-teal-400 rounded-full h-64 w-64 opacity-80"></div>
+                    </div>
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-white hover:bg-white/10"
+                        onClick={() => setMirrored(!mirrored)}
+                      >
+                        <RotateCw className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        onClick={captureFace}
+                        size="lg"
+                        className="h-12 w-12 rounded-full"
+                        disabled={isCapturing}
+                      >
+                        {isCapturing ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                          <Camera className="h-6 w-6" />
+                        )}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-white hover:bg-white/10" 
+                        onClick={stopCamera}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+              <Button 
+                variant="ghost" 
+                className="mt-4 text-white hover:bg-white/10" 
+                onClick={stopCamera}
+              >
+                <X className="mr-2 h-5 w-5" />
+                Close Camera
+              </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Change Room Dialog */}
-      <Dialog open={showChangeRoom} onOpenChange={setShowChangeRoom}>
-        <DialogContent className="sm:max-w-md">
+      {/* Edit Student Dialog */}
+      <Dialog open={showEditStudent} onOpenChange={(open) => {
+        if (!open) {
+          setFaceImage(undefined)
+        }
+        setShowEditStudent(open)
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Change Room Allocation</DialogTitle>
+            <DialogTitle className="text-2xl">Edit Student</DialogTitle>
             <DialogDescription>
-              Update room for {selectedStudent?.name} ({selectedStudent?.id})
+              Update student details for {editedStudent?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Block</Label>
-              <Select value={newBlock} onValueChange={setNewBlock}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select block" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Block A">Block A</SelectItem>
-                  <SelectItem value="Block B">Block B</SelectItem>
-                  <SelectItem value="Block C">Block C</SelectItem>
-                  <SelectItem value="Block D">Block D</SelectItem>
-                </SelectContent>
-              </Select>
+
+          <form onSubmit={handleUpdateStudent}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Full Name *</Label>
+                  <Input
+                    id="edit-name"
+                    name="name"
+                    placeholder="Student's full name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email *</Label>
+                  <Input
+                    id="edit-email"
+                    name="email"
+                    type="email"
+                    placeholder="Student's email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone Number *</Label>
+                  <Input
+                    id="edit-phone"
+                    name="phone"
+                    placeholder="Phone number"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-password">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="edit-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Leave blank to keep current"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-10"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-course">Course *</Label>
+                  <Input
+                    id="edit-course"
+                    name="course"
+                    placeholder="Course name"
+                    value={formData.course}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-year">Year *</Label>
+                  <Select 
+                    value={formData.year} 
+                    onValueChange={(value) => handleSelectChange("year", value)} 
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1st Year">1st Year</SelectItem>
+                      <SelectItem value="2nd Year">2nd Year</SelectItem>
+                      <SelectItem value="3rd Year">3rd Year</SelectItem>
+                      <SelectItem value="4th Year">4th Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status *</Label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(value) => handleSelectChange("status", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-address">Address *</Label>
+                <Textarea
+                  id="edit-address"
+                  name="address"
+                  placeholder="Student's address"
+                  rows={3}
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              {/* Optional Face Recognition */}
+              <div className="space-y-2">
+                <Label>Face Recognition (Optional)</Label>
+                <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg bg-muted/30">
+                  {!faceImage ? (
+                    <>
+                      <div className="text-center">
+                        <ScanFace className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-2 text-sm font-medium">Update Face Recognition</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          For enhanced identification (optional)
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <Button 
+                          variant="outline" 
+                          onClick={startCamera} 
+                          disabled={isScanning}
+                        >
+                          {isScanning ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Initializing Camera
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="mr-2 h-4 w-4" />
+                              Open Camera
+                            </>
+                          )}
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={uploadPhotoFallback}
+                        >
+                          Upload Photo
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <img
+                          src={faceImage}
+                          alt="Scanned face"
+                          className="h-40 w-40 rounded-full object-cover border-4 border-teal-200"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute -top-2 -right-2 rounded-full bg-background"
+                          onClick={removeImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Face image added</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Room Number</Label>
-              <Input 
-                value={newRoom} 
-                onChange={(e) => setNewRoom(e.target.value)}
-                placeholder="Enter new room number"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowChangeRoom(false)}>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowEditStudent(false)
+                  setFaceImage(undefined)
+                }}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSaveRoomChange}>
-                Update Room
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Student"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+
+          {/* Camera Modal */}
+          {showCamera && (
+            <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4">
+              <div className="w-full max-w-md aspect-square bg-black rounded-lg overflow-hidden relative">
+                {cameraError ? (
+                  <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                    <div className="bg-red-100 rounded-full p-4 mb-4">
+                      <X className="h-8 w-8 text-red-600" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Camera Error</h3>
+                    <p className="text-red-300 mb-6">{cameraError}</p>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={stopCamera}
+                        className="text-white border-white/30 hover:bg-white/10"
+                      >
+                        Close
+                      </Button>
+                      <Button onClick={retryCamera}>
+                        <RotateCw className="mr-2 h-4 w-4" />
+                        Try Again
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{ 
+                        width: 720, 
+                        height: 720, 
+                        facingMode: "user",
+                        aspectRatio: 1
+                      }}
+                      mirrored={mirrored}
+                      onUserMediaError={(error) => handleCameraError(error.toString())}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="border-4 border-teal-400 rounded-full h-64 w-64 opacity-80"></div>
+                    </div>
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-white hover:bg-white/10"
+                        onClick={() => setMirrored(!mirrored)}
+                      >
+                        <RotateCw className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        onClick={captureFace}
+                        size="lg"
+                        className="h-12 w-12 rounded-full"
+                        disabled={isCapturing}
+                      >
+                        {isCapturing ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                          <Camera className="h-6 w-6" />
+                        )}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-white hover:bg-white/10" 
+                        onClick={stopCamera}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+              <Button 
+                variant="ghost" 
+                className="mt-4 text-white hover:bg-white/10" 
+                onClick={stopCamera}
+              >
+                <X className="mr-2 h-5 w-5" />
+                Close Camera
               </Button>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Student</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. Are you sure you want to delete this student?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-4 py-4">
+            <div className="bg-red-100 p-2 rounded-full">
+              <Trash2 className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="font-medium">{selectedStudent?.name}</p>
+              <p className="text-sm text-muted-foreground">ID: {selectedStudent?.studentId}</p>
+            </div>
           </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteStudent}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Student"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Fee History Dialog */}
       <Dialog open={showFeeHistory} onOpenChange={setShowFeeHistory}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Fee Payment History</DialogTitle>
+            <DialogTitle className="text-2xl">Fee History</DialogTitle>
             <DialogDescription>
-              {selectedStudent?.name} ({selectedStudent?.id})
+              Payment records for {selectedStudent?.name} (ID: {selectedStudent?.studentId})
             </DialogDescription>
           </DialogHeader>
+          
           <div className="py-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Payment ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Amount (₹)</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead>Receipt Number</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {feeRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{record.id}</TableCell>
-                    <TableCell>{record.date}</TableCell>
-                    <TableCell>{record.amount.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          record.status === 'Paid' ? 'default' : 
-                          record.status === 'Pending' ? 'secondary' : 'destructive'
-                        }
-                        className={
-                          record.status === 'Paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                          record.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                        }
-                      >
-                        {record.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{record.paymentMethod || '-'}</TableCell>
-                    <TableCell>{record.receiptNumber || '-'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-between items-center">
-              <div className="text-sm text-muted-foreground">
-                Total Paid: ₹{feeRecords.filter(r => r.status === 'Paid').reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Pending: ₹{feeRecords.filter(r => r.status === 'Pending').reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+            <div className="flex items-center space-x-4 mb-6">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={selectedStudent?.image} />
+                <AvatarFallback>
+                  {selectedStudent?.name.split(" ").map(n => n[0]).join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-medium text-lg">{selectedStudent?.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedStudent?.course} • {selectedStudent?.year}
+                </p>
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
-              <Button className="bg-teal-600 hover:bg-teal-700">
-                <DollarSign className="mr-2 h-4 w-4" />
-                Record New Payment
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Student Details Dialog */}
-      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          {selectedStudent && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <DialogTitle className="text-2xl">{selectedStudent.name}</DialogTitle>
-                    <DialogDescription>Student ID: {selectedStudent.id}</DialogDescription>
-                  </div>
-                  <Badge
-                    variant={selectedStudent.status === "Active" ? "default" : "outline"}
-                    className={
-                      selectedStudent.status === "Active"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : "text-amber-800 border-amber-600 dark:text-amber-400 dark:border-amber-500"
-                    }
-                  >
-                    {selectedStudent.status}
-                  </Badge>
-                </div>
-              </DialogHeader>
-              <div className="grid gap-6 py-4">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex flex-col items-center gap-3">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={selectedStudent.image} alt={selectedStudent.name} />
-                      <AvatarFallback>{selectedStudent.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Change Photo
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Email</Label>
-                      <p>{selectedStudent.email}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Phone</Label>
-                      <p>{selectedStudent.phone}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Course</Label>
-                      <p>{selectedStudent.course}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Year</Label>
-                      <p>{selectedStudent.year}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Room</Label>
-                      <p>{selectedStudent.room} ({selectedStudent.block})</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Join Date</Label>
-                      <p>{selectedStudent.joinDate}</p>
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <Label className="text-muted-foreground">Address</Label>
-                      <p>{selectedStudent.address}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3">Quick Actions</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9"
-                      onClick={() => {
-                        handleEditStudent(selectedStudent)
-                        setSelectedStudent(null)
-                      }}
-                    >
-                      Edit Details
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9"
-                      onClick={() => {
-                        handleChangeRoom(selectedStudent)
-                        setSelectedStudent(null)
-                      }}
-                    >
-                      Change Room
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9"
-                      onClick={() => {
-                        handleViewFeeHistory(selectedStudent)
-                        setSelectedStudent(null)
-                      }}
-                    >
-                      View Fees
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-9 text-red-600 dark:text-red-400">
-                      {selectedStudent.status === "Active" ? "Deactivate" : "Activate"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={() => setSelectedStudent(null)}>Close</Button>
-              </div>
-            </>
-          )}
+            <Tabs defaultValue="history">
+              <TabsList className="mb-4">
+                <TabsTrigger value="history">Fee History</TabsTrigger>
+                <TabsTrigger value="add">Add Payment</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="history">
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Receipt</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Method</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedStudent && feeRecords[selectedStudent._id] ? (
+                          feeRecords[selectedStudent._id].map(record => (
+                            <TableRow key={record._id}>
+                              <TableCell>{record.receiptNumber || "N/A"}</TableCell>
+                              <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                              <TableCell>₹{record.amount.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    record.status === "Paid" ? "default" :
+                                    record.status === "Pending" ? "secondary" : "destructive"
+                                  }
+                                >
+                                  {record.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{record.paymentMethod || "N/A"}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-6">
+                              <div className="flex flex-col items-center gap-2">
+                                <DollarSign className="h-8 w-8 text-muted-foreground" />
+                                <p className="text-muted-foreground">No fee records found</p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="add">
+                <Card>
+                  <CardContent className="p-4">
+                    <form className="grid gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Amount (₹) *</Label>
+                          <Input 
+                            id="amount" 
+                            type="number" 
+                            placeholder="Enter amount" 
+                            required 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="payment-method">Payment Method *</Label>
+                          <Select defaultValue="online">
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="online">Online Transfer</SelectItem>
+                              <SelectItem value="card">Credit/Debit Card</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="cheque">Cheque</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status *</Label>
+                          <Select defaultValue="Paid">
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Paid">Paid</SelectItem>
+                              <SelectItem value="Pending">Pending</SelectItem>
+                              <SelectItem value="Overdue">Overdue</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="receipt">Receipt Number</Label>
+                          <Input id="receipt" placeholder="Optional receipt number" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="notes">Notes</Label>
+                        <Textarea id="notes" placeholder="Additional notes" rows={3} />
+                      </div>
+                      <div className="flex justify-end gap-2 mt-2">
+                        <Button type="button" variant="outline">
+                          Cancel
+                        </Button>
+                        <Button type="submit">
+                          Add Payment
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
