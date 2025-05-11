@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Clock, XCircle, MessageSquare, PlusCircle } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +27,12 @@ type Complaint = {
   createdAt: string;
   updatedAt?: string;
   response?: string;
+  comments?: {
+    id: string;
+    text: string;
+    createdAt: string;
+    author: string;
+  }[];
 };
 
 export default function StudentComplaintsPage() {
@@ -36,6 +41,8 @@ export default function StudentComplaintsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [newComment, setNewComment] = useState('');
   
   // Form state
   const [newComplaint, setNewComplaint] = useState({
@@ -44,72 +51,45 @@ export default function StudentComplaintsPage() {
     category: 'Maintenance'
   });
 
-  // Mock student data
-  const student = {
-    id: 'ST2023001',
-    name: 'Rahul Sharma',
-    room: 'A-101',
-    profileImg: 'https://randomuser.me/api/portraits/men/1.jpg'
-  };
-
   const categories = ['Maintenance', 'Furniture', 'Internet', 'Housekeeping', 'Electrical', 'Other'];
 
   useEffect(() => {
     const fetchComplaints = async () => {
       setIsLoading(true);
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const response = await fetch('http://localhost:5000/api/student/complaints', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
         
-        // Mock data for the current student
-        const mockComplaints: Complaint[] = [
-          {
-            id: 'CP2023001',
-            title: 'Water leakage in bathroom',
-            description: 'There is continuous water leakage from the ceiling in the common bathroom',
-            category: 'Maintenance',
-            status: 'pending',
-            createdAt: '2023-05-10T09:30:00Z'
-          },
-          {
-            id: 'CP2023002',
-            title: 'Broken chair in study room',
-            description: 'Chair in the study room has broken legs and is unsafe to use',
-            category: 'Furniture',
-            status: 'in-progress',
-            createdAt: '2023-05-08T14:15:00Z',
-            updatedAt: '2023-05-09T10:20:00Z',
-            response: 'We have ordered replacement parts. Expected resolution in 3-5 days.'
-          },
-          {
-            id: 'CP2023003',
-            title: 'No hot water supply',
-            description: 'No hot water in the morning for the past 3 days',
-            category: 'Maintenance',
-            status: 'resolved',
-            createdAt: '2023-05-05T07:45:00Z',
-            updatedAt: '2023-05-07T16:30:00Z',
-            response: 'Boiler issue fixed. Hot water supply restored.'
-          },
-          {
-            id: 'CP2023004',
-            title: 'WiFi not working',
-            description: 'Unable to connect to hostel WiFi since yesterday evening',
-            category: 'Internet',
-            status: 'rejected',
-            createdAt: '2023-05-03T18:20:00Z',
-            updatedAt: '2023-05-04T11:15:00Z',
-            response: 'Issue was with your device settings. IT confirmed network working normally.'
-          }
-        ];
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch complaints');
+        }
+        
+        const data = await response.json();
+        
+        // Handle different response structures
+        const complaintsArray = Array.isArray(data) 
+          ? data 
+          : data.data || data.complaints || [];
+        
+        if (!Array.isArray(complaintsArray)) {
+          throw new Error('Invalid data format received from server');
+        }
 
-        setComplaints(mockComplaints);
-      } catch (error) {
+        setComplaints(complaintsArray);
+      } catch (error: any) {
+        console.error('Fetch error:', error);
         toast({
           title: "Error",
-          description: "Failed to load your complaints",
+          description: error.message || "Failed to load complaints",
           variant: "destructive"
         });
+        setComplaints([]);
       } finally {
         setIsLoading(false);
       }
@@ -118,8 +98,35 @@ export default function StudentComplaintsPage() {
     fetchComplaints();
   }, [toast]);
 
+  const fetchComplaintDetails = async (id: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/student/complaints/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch complaint details');
+      }
+      
+      const data = await response.json();
+      setSelectedComplaint(data);
+    } catch (error: any) {
+      console.error('Error fetching details:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load complaint details",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSubmitComplaint = async () => {
-    if (!newComplaint.title || !newComplaint.description) {
+    if (!newComplaint.title.trim() || !newComplaint.description.trim()) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -130,23 +137,34 @@ export default function StudentComplaintsPage() {
 
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('http://localhost:5000/api/student/complaints', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: newComplaint.title,
+          description: newComplaint.description,
+          category: newComplaint.category
+        })
+      });
       
-      const newComplaintObj: Complaint = {
-        id: `CP${new Date().getFullYear()}${Math.floor(1000 + Math.random() * 9000)}`,
-        title: newComplaint.title,
-        description: newComplaint.description,
-        category: newComplaint.category,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      setComplaints(prev => [newComplaintObj, ...prev]);
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        // Handle server-side validation errors
+        if (response.status === 400 || response.status === 422) {
+          throw new Error(responseData.message || 'Validation failed');
+        }
+        throw new Error(responseData.message || `Server error: ${response.status}`);
+      }
+      
+      setComplaints(prev => [responseData, ...prev]);
       toast({
-        title: "Complaint Submitted",
-        description: "Your complaint has been successfully submitted",
-        className: "bg-green-500 text-white border-0"
+        title: "Success",
+        description: "Complaint submitted successfully",
+        variant: "default"
       });
       
       // Reset form
@@ -156,14 +174,65 @@ export default function StudentComplaintsPage() {
         category: 'Maintenance'
       });
       setIsDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Submission error:', error);
       toast({
-        title: "Error",
-        description: "Failed to submit your complaint",
+        title: "Submission Failed",
+        description: error.message || "Failed to submit complaint",
         variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() || !selectedComplaint) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a comment",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/student/complaints/${selectedComplaint.id}/comments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            text: newComment
+          })
+        }
+      );
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || `Server error: ${response.status}`);
+      }
+      
+      // Update the selected complaint with new comments
+      setSelectedComplaint(responseData);
+      setNewComment('');
+      
+      toast({
+        title: "Success",
+        description: "Comment added successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
+      console.error('Comment error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add comment",
+        variant: "destructive"
+      });
     }
   };
 
@@ -206,14 +275,12 @@ export default function StudentComplaintsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
+    <div className="container mx-auto py-6">
+      <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">My Complaints</h1>
-            <CardDescription className="text-muted-foreground">
-              Submit and track your hostel complaints
-            </CardDescription>
+            <h1 className="text-3xl font-bold">My Complaints</h1>
+            <p className="text-muted-foreground">Submit and track your hostel complaints</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -228,18 +295,17 @@ export default function StudentComplaintsPage() {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <label htmlFor="title" className="text-sm font-medium">
+                  <label className="text-sm font-medium">
                     Title <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    id="title"
                     placeholder="Brief description of the issue"
                     value={newComplaint.title}
                     onChange={(e) => setNewComplaint({...newComplaint, title: e.target.value})}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <label htmlFor="category" className="text-sm font-medium">
+                  <label className="text-sm font-medium">
                     Category <span className="text-red-500">*</span>
                   </label>
                   <Select 
@@ -250,19 +316,18 @@ export default function StudentComplaintsPage() {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((category, index) => (
-                        <SelectItem key={index} value={category}>{category}</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <label htmlFor="description" className="text-sm font-medium">
-                    Detailed Description <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium">
+                    Description <span className="text-red-500">*</span>
                   </label>
                   <Textarea
-                    id="description"
-                    placeholder="Provide detailed information about the issue..."
+                    placeholder="Provide detailed information..."
                     rows={5}
                     value={newComplaint.description}
                     onChange={(e) => setNewComplaint({...newComplaint, description: e.target.value})}
@@ -278,129 +343,158 @@ export default function StudentComplaintsPage() {
                   </Button>
                   <Button 
                     onClick={handleSubmitComplaint}
-                    disabled={isSubmitting || !newComplaint.title || !newComplaint.description}
+                    disabled={isSubmitting || !newComplaint.title.trim() || !newComplaint.description.trim()}
                   >
-                    {isSubmitting ? "Submitting..." : "Submit Complaint"}
+                    {isSubmitting ? "Submitting..." : "Submit"}
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
         </div>
-      </div>
 
-      <Card className="border-gray-200 dark:border-gray-800">
-        <CardHeader className="bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            <CardTitle className="text-gray-900 dark:text-white">Your Complaints</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
+        <Card>
+          <CardHeader className="bg-muted/50">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-6 w-6 text-primary" />
+              <CardTitle>Your Complaints</CardTitle>
             </div>
-          ) : complaints.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
-              <MessageSquare className="h-8 w-8" />
-              <p>You haven't submitted any complaints yet</p>
-              <Button onClick={() => setIsDialogOpen(true)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Submit Your First Complaint
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
-                <TableRow>
-                  <TableHead className="w-[200px]">Complaint</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead className="text-right">Last Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {complaints.map((complaint) => (
-                  <TableRow key={complaint.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/10">
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{complaint.title}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-1">
-                          {complaint.description}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{complaint.category}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(complaint.status)}
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(complaint.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {complaint.updatedAt ? formatDate(complaint.updatedAt) : '-'}
-                    </TableCell>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              </div>
+            ) : complaints.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                <MessageSquare className="h-8 w-8" />
+                <p>No complaints found</p>
+                <Button onClick={() => setIsDialogOpen(true)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Submit a Complaint
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[200px]">Complaint</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead className="text-right">Updated</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {complaints.map((complaint) => (
+                    <TableRow 
+                      key={complaint.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => fetchComplaintDetails(complaint.id)}
+                    >
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{complaint.title}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {complaint.description}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{complaint.category}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(complaint.status)}
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(complaint.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {complaint.updatedAt ? formatDate(complaint.updatedAt) : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Complaint Details Modal */}
-      {complaints.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Complaint Details</h2>
-          {complaints.map((complaint) => (
-            <Card key={complaint.id} className="border-gray-200 dark:border-gray-800">
-              <CardHeader className="border-b border-gray-200 dark:border-gray-800">
+        {selectedComplaint && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">Complaint Details</h2>
+            <Card>
+              <CardHeader className="border-b">
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle className="text-lg">{complaint.title}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline">{complaint.category}</Badge>
-                      {getStatusBadge(complaint.status)}
+                    <CardTitle>{selectedComplaint.title}</CardTitle>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline">{selectedComplaint.category}</Badge>
+                      {getStatusBadge(selectedComplaint.status)}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Submitted: {formatDate(complaint.createdAt)}
+                    Submitted: {formatDate(selectedComplaint.createdAt)}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-4">
+              <CardContent className="pt-4 space-y-4">
+                <div>
+                  <h3 className="font-medium mb-2">Description</h3>
+                  <p className="text-muted-foreground">{selectedComplaint.description}</p>
+                </div>
+                
+                {selectedComplaint.response && (
                   <div>
-                    <h3 className="font-medium mb-2">Description</h3>
-                    <p className="text-muted-foreground">{complaint.description}</p>
+                    <h3 className="font-medium mb-2">
+                      {selectedComplaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution'}
+                    </h3>
+                    <div className="bg-muted p-4 rounded-lg">
+                      <p>{selectedComplaint.response}</p>
+                    </div>
                   </div>
-                  
-                  {complaint.response && (
-                    <div>
-                      <h3 className="font-medium mb-2">
-                        {complaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution Details'}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-900/30 p-4 rounded-lg">
-                        <p className="text-muted-foreground">{complaint.response}</p>
-                      </div>
+                )}
+                
+                {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
+                  <div>
+                    <h3 className="font-medium mb-2">Comments</h3>
+                    <div className="space-y-3">
+                      {selectedComplaint.comments.map((comment) => (
+                        <div key={comment.id} className="bg-muted p-4 rounded-lg">
+                          <div className="flex justify-between">
+                            <p className="font-medium">{comment.author}</p>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDate(comment.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-2">{comment.text}</p>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  
-                  {complaint.updatedAt && (
-                    <div className="text-sm text-muted-foreground">
-                      Last updated: {formatDate(complaint.updatedAt)}
-                    </div>
-                  )}
+                  </div>
+                )}
+                
+                <div className="pt-4">
+                  <h3 className="font-medium mb-2">Add Comment</h3>
+                  <div className="flex gap-2">
+                    <Textarea
+                      placeholder="Type your comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                    />
+                    <Button 
+                      onClick={handleSubmitComment}
+                      disabled={!newComment.trim()}
+                    >
+                      Submit
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -4,21 +4,21 @@ const complaintSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
+      
     },
     description: {
       type: String,
-      required: true,
+      
     },
     category: {
       type: String,
-      enum: ["maintenance", "cleanliness", "food", "security", "other"],
-      required: true,
+      enum: ["Maintenance", "cleanliness", "food", "security", "other"],
+      
     },
     priority: {
       type: String,
-      enum: ["low", "medium", "high", "urgent"],
-      default: "medium",
+      enum: ["low", "medium", "High", "urgent"],
+      default: "Medium",
     },
     status: {
       type: String,
@@ -28,7 +28,7 @@ const complaintSchema = new mongoose.Schema(
     submittedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      
     },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,

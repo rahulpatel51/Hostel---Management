@@ -133,59 +133,63 @@ export const getCurrentUser = async (req, res) => {
     })
   }
 }
-
 // Update profile
 export const updateProfile = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, phone } = req.body
-    const updateData = {}
+    const { firstName, lastName, email, phone, profileImage, profilePicture } = req.body;
+    const updateData = {};
 
-    if (firstName) updateData.firstName = firstName
-    if (lastName) updateData.lastName = lastName
+    // Update basic fields if provided
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
 
     if (email) {
-      const existingEmail = await User.findOne({ email, _id: { $ne: req.user.id } })
+      const existingEmail = await User.findOne({ email, _id: { $ne: req.user.id } });
       if (existingEmail) {
         return res.status(400).json({
           success: false,
           message: "Email already in use",
-        })
+        });
       }
-      updateData.email = email
+      updateData.email = email;
     }
 
     if (phone) {
-      const existingPhone = await User.findOne({ phone, _id: { $ne: req.user.id } })
+      const existingPhone = await User.findOne({ phone, _id: { $ne: req.user.id } });
       if (existingPhone) {
         return res.status(400).json({
           success: false,
           message: "Phone number already in use",
-        })
+        });
       }
-      updateData.phone = phone
+      updateData.phone = phone;
     }
 
-    if (req.body.profileImage) {
-      const profilePicture = await uploadImage(
-        req.body.profileImage,
-        `hostel_management/profile/${req.user.role}/${req.user.id}`,
-      )
-      updateData.profilePicture = profilePicture
+    // Handle profile image upload or direct URL
+    if (profileImage) {
+      const uploadedUrl = await uploadImage(
+        profileImage,
+        `hostel_management/profile/${req.user.role}/${req.user.id}`
+      );
+      updateData.profilePicture = uploadedUrl;
+    } else if (profilePicture) {
+      updateData.profilePicture = profilePicture;
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updateData, { 
-      new: true, 
-      runValidators: true 
-    }).select("-password")
+    // Perform update
+    const user = await User.findByIdAndUpdate(req.user.id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     res.status(200).json({
       success: true,
       data: user,
-    })
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
 // Change password
 export const changePassword = async (req, res, next) => {
