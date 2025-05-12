@@ -187,9 +187,6 @@ export const addCommentToComplaint = async (req, res, next) => {
   }
 }
 
-
-
-
 // Apply for leave
 export const applyForLeave = async (req, res, next) => {
   try {

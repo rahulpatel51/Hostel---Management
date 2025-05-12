@@ -18,7 +18,11 @@ import {
   getReportById,
   markAttendance,
   getAttendanceByDate,
-  getAttendanceDates
+  getAttendanceDates,
+  getAllComplaints,
+  updateComplaintByAdmin,
+  // addCommentToComplaint,
+  // getComplaintById,
 } from "../Controllers/AdminController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -57,6 +61,12 @@ router.get("/reports/:id", getReportById)
 // Mark attendance (bulk operation)
 router.post('/attendance', markAttendance);
 
+// Complaint routes
+router.get("/complaints", getAllComplaints)
+router.put("/complaints/:id", updateComplaintByAdmin)
+// router.post("/complaints/:id/comments", addCommentToComplaint)
+// router.get("/complaints/:id", getComplaintById)
+// 
 // Get attendance by date
 router.get('/attendance/:date', getAttendanceByDate);
 

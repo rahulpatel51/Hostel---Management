@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, XCircle, MessageSquare, PlusCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, XCircle, MessageSquare, PlusCircle, Loader2, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,6 +25,8 @@ type Complaint = {
   assignedTo?: string;
   images?: string[];
   comments?: {
+    name: string;
+    profileImg: string | Blob | undefined;
     _id: string;
     text: string;
    timestamp: string;
@@ -455,87 +457,109 @@ export default function StudentComplaintsPage() {
         </Card>
 
         {/* Complaint Details Dialog */}
-        <Dialog open={!!selectedComplaint} onOpenChange={(open) => !open && setSelectedComplaint(null)}>
-          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-            {selectedComplaint && (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-2xl">{selectedComplaint.title}</DialogTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline">{selectedComplaint.roomNumber}</Badge>
-                    <Badge variant="outline">{selectedComplaint.category}</Badge>
-                    {getStatusBadge(selectedComplaint.status)}
-                  </div>
-                </DialogHeader>
-                
-                <div className="space-y-6 pt-4">
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-lg">Description</h3>
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                      {selectedComplaint.description}
-                    </p>
-                  </div>
-                  
-                  {selectedComplaint.response && (
-                    <div className="space-y-2">
-                      <h3 className="font-medium text-lg">
-                        {selectedComplaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution'}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 whitespace-pre-line">
-                        {selectedComplaint.response}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="font-medium text-lg">Comments</h3>
-                      <div className="space-y-3">
-                        {selectedComplaint.comments.map((comment) => (
-                          <div 
-                            key={comment._id} 
-                            className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
-                          >
-                            <div className="flex justify-between">
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                {comment.author?.name || 'Unknown'}
-                              </p>
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {formatDate(comment.timestamp)}
-                              </span>
-                            </div>
-                            <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
-                              {comment.text}
-                            </p>
+<Dialog open={!!selectedComplaint} onOpenChange={(open) => !open && setSelectedComplaint(null)}>
+  <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+    {selectedComplaint && (
+      <>
+        <DialogHeader>
+          <DialogTitle className="text-2xl">{selectedComplaint.title}</DialogTitle>
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline">{selectedComplaint.roomNumber}</Badge>
+            <Badge variant="outline">{selectedComplaint.category}</Badge>
+            {getStatusBadge(selectedComplaint.status)}
+          </div>
+        </DialogHeader>
+        
+        <div className="space-y-6 pt-4">
+          <div className="space-y-2">
+            <h3 className="font-medium text-lg">Description</h3>
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line text-justify ">
+              {selectedComplaint.description}
+            </p>
+          </div>
+          
+          {selectedComplaint.response && (
+            <div className="space-y-2">
+              <h3 className="font-medium text-lg">
+                {selectedComplaint.status === 'rejected' ? 'Reason for Rejection' : 'Resolution'}
+              </h3>
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 whitespace-pre-line">
+                {selectedComplaint.response}
+              </div>
+            </div>
+          )}
+          
+          {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-lg">Comments</h3>
+              <div className="space-y-3">
+                {selectedComplaint.comments.map((comment) => (
+                  <div 
+                    key={comment._id} 
+                    className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        {comment.profileImg ? (
+                          <img 
+                            src={comment.profileImg} 
+                            alt={comment.name || 'Student'}
+                            className="h-10 w-10 rounded-full object-cover border-2 border-indigo-100 dark:border-indigo-900"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center border-2 border-indigo-200 dark:border-indigo-800">
+                            <User className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />
                           </div>
-                        ))}
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                              {comment.name || 'Student'}
+                            </p>
+                            <Badge variant="outline" className="text-xs px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
+                              Student
+                            </Badge>
+                          </div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">
+                            {formatDate(comment.timestamp)}
+                          </span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
+                          {comment.text}
+                        </p>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-lg">Add Comment</h3>
-                    <div className="flex gap-2">
-                      <Textarea
-                        placeholder="Add your comment here..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="flex-1 border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
-                      />
-                      <Button 
-                        onClick={handleSubmitComment}
-                        disabled={!newComment.trim()}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-                      >
-                        Submit
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <h3 className="font-medium text-lg">Add Comment</h3>
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Add your comment here..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                className="flex-1 border-gray-300 dark:border-gray-600 focus-visible:ring-indigo-500"
+              />
+              <Button 
+                onClick={handleSubmitComment}
+                disabled={!newComment.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+              >
+                Submit
+              </Button>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import Student from "../Models/Student.js";
 import Warden from "../Models/Warden.js";
 import Room from "../Models/Room.js";
 import Attendance from '../Models/Attendance.js';
+import Complaint from "../Models/Complaint.js";
 import Report from "../Models/Report.js";
 import { uploadImage } from "../Config/cloudinary.js";
 import bcrypt from "bcryptjs";
@@ -643,3 +644,148 @@ export const getAttendanceDates = async (req, res, next) => {
     next(error);
   }
 };
+
+
+// GET: Fetch all complaints (Admin)
+export const getAllComplaints = async (req, res, next) => {
+  try {
+    const complaints = await Complaint.find()
+      .populate({
+        path: "submittedBy",
+        select: "firstName lastName profilePicture studentId email", // include full name fields
+      })
+      .populate({
+        path: "assignedTo",
+        select: "firstName lastName profilePicture", // optional
+      })
+      .sort({ createdAt: -1 });
+
+    // Map fullName manually for submittedBy and assignedTo
+    const formattedComplaints = complaints.map((complaint) => {
+      const submittedBy = complaint.submittedBy
+        ? {
+            ...complaint.submittedBy._doc,
+            fullName: `${complaint.submittedBy.firstName || ""} ${complaint.submittedBy.lastName || ""}`.trim(),
+          }
+        : null;
+
+      const assignedTo = complaint.assignedTo
+        ? {
+            ...complaint.assignedTo._doc,
+            fullName: `${complaint.assignedTo.firstName || ""} ${complaint.assignedTo.lastName || ""}`.trim(),
+          }
+        : null;
+
+      return {
+        ...complaint._doc,
+        submittedBy,
+        assignedTo,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: formattedComplaints.length,
+      data: formattedComplaints,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const getComplaintById = async (req, res, next) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id)
+      .populate({
+        path: "submittedBy",
+        select: "firstName lastName profilePicture studentId email",
+      })
+      .populate({
+        path: "assignedTo",
+        select: "firstName lastName profilePicture",
+      })
+      .populate({
+        path: "comments.user",
+        select: "firstName lastName profilePicture",
+      });
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // Add fullName to submittedBy and assignedTo
+    const submittedBy = complaint.submittedBy
+      ? {
+          ...complaint.submittedBy._doc,
+          fullName: `${complaint.submittedBy.firstName || ""} ${complaint.submittedBy.lastName || ""}`.trim(),
+        }
+      : null;
+
+    const assignedTo = complaint.assignedTo
+      ? {
+          ...complaint.assignedTo._doc,
+          fullName: `${complaint.assignedTo.firstName || ""} ${complaint.assignedTo.lastName || ""}`.trim(),
+        }
+      : null;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...complaint._doc,
+        submittedBy,
+        assignedTo,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// PUT: Update complaint status and assign (Admin)
+export const updateComplaintByAdmin = async (req, res, next) => {
+  try {
+    const { status, remarks, assignedTo } = req.body;
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    if (status) {
+      complaint.status = status;
+      if (status === "resolved") {
+        complaint.resolvedAt = Date.now();
+      }
+    }
+
+    if (remarks) {
+      complaint.comments.push({
+        text: remarks,
+        user: req.user.id, // Admin who commented
+      });
+    }
+
+    if (assignedTo) {
+      complaint.assignedTo = assignedTo;
+    }
+
+    await complaint.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Complaint updated successfully",
+      data: complaint,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

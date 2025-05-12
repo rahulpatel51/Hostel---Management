@@ -304,6 +304,7 @@ export const getRooms = async (req, res, next) => {
   }
 }
 
+
 // Get all complaints assigned to warden
 export const getComplaints = async (req, res, next) => {
   try {
