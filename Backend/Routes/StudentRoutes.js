@@ -9,7 +9,7 @@ import {
   applyForLeave,
   getLeaveApplications,
   getLeaveApplicationById,
-  cancelLeaveApplication,
+ deleteLeaveApplication,
   getFeeDetails,
   getAttendanceRecords,
 } from "../Controllers/StudentController.js"
@@ -36,7 +36,7 @@ router.post("/complaints/:id/comments", addCommentToComplaint)
 router.post("/leave", applyForLeave)
 router.get("/leave", getLeaveApplications)
 router.get("/leave/:id", getLeaveApplicationById)
-router.put("/leave/:id/cancel", cancelLeaveApplication)
+router.delete("/leave/:id/delete", deleteLeaveApplication)
 
 // Fee routes
 router.get("/fees", getFeeDetails)

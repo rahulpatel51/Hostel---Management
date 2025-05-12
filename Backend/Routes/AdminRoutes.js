@@ -23,6 +23,8 @@ import {
   updateComplaintByAdmin,
   // addCommentToComplaint,
   // getComplaintById,
+  getLeaveApplications,
+  updateLeaveStatus,
 } from "../Controllers/AdminController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -66,9 +68,13 @@ router.get("/complaints", getAllComplaints)
 router.put("/complaints/:id", updateComplaintByAdmin)
 // router.post("/complaints/:id/comments", addCommentToComplaint)
 // router.get("/complaints/:id", getComplaintById)
-// 
+
 // Get attendance by date
 router.get('/attendance/:date', getAttendanceByDate);
+
+// Leave routes
+router.get("/leave", getLeaveApplications)
+router.put("/leave/:id", updateLeaveStatus)
 
 // Get all unique dates with attendance records
 router.get('/attendance/dates/all', getAttendanceDates); // FIRST

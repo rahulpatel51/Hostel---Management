@@ -298,44 +298,41 @@ export const getLeaveApplicationById = async (req, res, next) => {
 }
 
 // Cancel leave application
-export const cancelLeaveApplication = async (req, res, next) => {
+export const deleteLeaveApplication = async (req, res, next) => {
   try {
     // Find student
-    const student = await Student.findOne({ userId: req.user.id })
+    const student = await Student.findOne({ userId: req.user.id });
 
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student profile not found",
-      })
+      });
     }
 
-    // Find leave application
-    const leave = await Leave.findOne({
+    // Find and delete leave application
+    const deletedLeave = await Leave.findOneAndDelete({
       _id: req.params.id,
       student: student._id,
-      status: "pending",
-    })
+      status: "pending", // Only allow deletion if it's still pending
+    });
 
-    if (!leave) {
+    if (!deletedLeave) {
       return res.status(404).json({
         success: false,
-        message: "Leave application not found or cannot be cancelled",
-      })
+        message: "Leave application not found or already processed",
+      });
     }
-
-    // Update leave status
-    leave.status = "cancelled"
-    await leave.save()
 
     res.status(200).json({
       success: true,
-      data: leave,
-    })
+      message: "Leave application deleted successfully",
+      data: deletedLeave,
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
 // Get fee details
 export const getFeeDetails = async (req, res, next) => {

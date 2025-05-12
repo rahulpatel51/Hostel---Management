@@ -2,6 +2,7 @@ import User from "../Models/User.js";
 import Student from "../Models/Student.js";
 import Warden from "../Models/Warden.js";
 import Room from "../Models/Room.js";
+import Leave from "../Models/Leave.js";
 import Attendance from '../Models/Attendance.js';
 import Complaint from "../Models/Complaint.js";
 import Report from "../Models/Report.js";
@@ -783,6 +784,92 @@ export const updateComplaintByAdmin = async (req, res, next) => {
       success: true,
       message: "Complaint updated successfully",
       data: complaint,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+// Get all leave applications (admin version)
+export const getLeaveApplications = async (req, res, next) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access - Admin privileges required",
+      });
+    }
+
+    // Get all leave applications
+    const leaves = await Leave.find()
+      .populate({
+        path: "student",
+        select: "name rollNumber",
+        populate: {
+          path: "userId",
+          select: "username profilePicture",
+        },
+      })
+      .populate({
+        path: "approvedBy",
+        select: "name role",
+      })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: leaves.length,
+      data: leaves,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update leave application status (admin version)
+export const updateLeaveStatus = async (req, res, next) => {
+  try {
+    const { status, remarks } = req.body;
+
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access - Admin privileges required",
+      });
+    }
+
+    // Find leave application
+    const leave = await Leave.findById(req.params.id);
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave application not found",
+      });
+    }
+
+    // Update leave status
+    leave.status = status;
+    leave.remarks = remarks || '';
+    leave.approvedBy = req.user.id;
+    leave.approvalDate = Date.now();
+
+    await leave.save();
+
+    // Populate the approvedBy field for response
+    const updatedLeave = await Leave.findById(leave._id)
+      .populate({
+        path: "approvedBy",
+        select: "name role",
+      });
+
+    res.status(200).json({
+      success: true,
+      data: updatedLeave,
     });
   } catch (error) {
     next(error);
