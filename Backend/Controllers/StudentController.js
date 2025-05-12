@@ -187,6 +187,7 @@ export const addCommentToComplaint = async (req, res, next) => {
   }
 }
 
+
 // Apply for leave
 export const applyForLeave = async (req, res, next) => {
   try {
@@ -229,6 +230,7 @@ export const applyForLeave = async (req, res, next) => {
     next(error)
   }
 }
+
 
 // Get all leave applications by student
 export const getLeaveApplications = async (req, res, next) => {
@@ -333,6 +335,66 @@ export const deleteLeaveApplication = async (req, res, next) => {
     next(error);
   }
 };
+
+// Edit leave application
+export const editLeaveApplication = async (req, res, next) => {
+  try {
+    const {
+      leaveType,
+      startDate,
+      endDate,
+      reason,
+      destination,
+      contactDuringLeave,
+      parentApproval,
+    } = req.body;
+
+    // Find student
+    const student = await Student.findOne({ userId: req.user.id });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found",
+      });
+    }
+
+    // Find and update leave application if it's pending
+    const updatedLeave = await Leave.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        student: student._id,
+        status: "pending",
+      },
+      {
+        leaveType,
+        startDate,
+        endDate,
+        reason,
+        destination,
+        contactDuringLeave,
+        parentApproval,
+      },
+      { new: true }
+    );
+
+    if (!updatedLeave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave application not found or already processed",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Leave application updated successfully",
+      data: updatedLeave,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 // Get fee details
 export const getFeeDetails = async (req, res, next) => {

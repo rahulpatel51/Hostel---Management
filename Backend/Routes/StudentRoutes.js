@@ -12,6 +12,7 @@ import {
  deleteLeaveApplication,
   getFeeDetails,
   getAttendanceRecords,
+  editLeaveApplication,
 } from "../Controllers/StudentController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -37,6 +38,7 @@ router.post("/leave", applyForLeave)
 router.get("/leave", getLeaveApplications)
 router.get("/leave/:id", getLeaveApplicationById)
 router.delete("/leave/:id/delete", deleteLeaveApplication)
+router.put("/leave/:id/edit", editLeaveApplication);
 
 // Fee routes
 router.get("/fees", getFeeDetails)
