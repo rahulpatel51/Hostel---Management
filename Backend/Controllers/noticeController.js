@@ -2,7 +2,7 @@ import Notice from "../Models/Notice.js";
 import { uploadMultipleImages } from "../Config/cloudinary.js";
 import { isValidObjectId } from "mongoose";
 
-// Create notice
+// Create notice (unchanged)
 export const createNotice = async (req, res, next) => {
   try {
     const { title, content, category, importance, targetAudience, expiryDate } = req.body;
@@ -71,7 +71,7 @@ export const createNotice = async (req, res, next) => {
   }
 };
 
-// Get all notices with pagination and filtering
+// Get all notices with pagination and filtering - UPDATED
 export const getAllNotices = async (req, res, next) => {
   try {
     // Pagination
@@ -105,15 +105,26 @@ export const getAllNotices = async (req, res, next) => {
       ];
     }
 
-    // Get notices with pagination
+    // Get notices with pagination - UPDATED to include fullName
     const notices = await Notice.find(query)
       .populate({
         path: "publishedBy",
-        select: "username profilePicture",
+        select: "firstName lastName username profilePicture",
       })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+
+    // Transform notices to include fullName
+    const transformedNotices = notices.map(notice => {
+      const noticeObj = notice.toObject();
+      if (noticeObj.publishedBy) {
+        noticeObj.publishedBy.fullName = 
+          `${noticeObj.publishedBy.firstName || ''} ${noticeObj.publishedBy.lastName || ''}`.trim() || 
+          noticeObj.publishedBy.username;
+      }
+      return noticeObj;
+    });
 
     // Get total count for pagination
     const totalNotices = await Notice.countDocuments(query);
@@ -124,7 +135,7 @@ export const getAllNotices = async (req, res, next) => {
       total: totalNotices,
       page,
       pages: Math.ceil(totalNotices / limit),
-      data: notices,
+      data: transformedNotices,
     });
   } catch (error) {
     console.error("Get all notices error:", error);
@@ -132,7 +143,7 @@ export const getAllNotices = async (req, res, next) => {
   }
 };
 
-// Get notice by ID
+// Get notice by ID - UPDATED
 export const getNoticeById = async (req, res, next) => {
   try {
     // Validate ID
@@ -145,7 +156,7 @@ export const getNoticeById = async (req, res, next) => {
 
     const notice = await Notice.findById(req.params.id).populate({
       path: "publishedBy",
-      select: "username profilePicture",
+      select: "firstName lastName username profilePicture",
     });
 
     if (!notice) {
@@ -170,9 +181,17 @@ export const getNoticeById = async (req, res, next) => {
       notice.publishedBy._id.toString() === req.user.id.toString() ||
       req.user.role === "admin"
     ) {
+      // Transform notice to include fullName
+      const noticeObj = notice.toObject();
+      if (noticeObj.publishedBy) {
+        noticeObj.publishedBy.fullName = 
+          `${noticeObj.publishedBy.firstName || ''} ${noticeObj.publishedBy.lastName || ''}`.trim() || 
+          noticeObj.publishedBy.username;
+      }
+
       res.status(200).json({
         success: true,
-        data: notice,
+        data: noticeObj,
       });
     } else {
       res.status(403).json({
@@ -186,7 +205,7 @@ export const getNoticeById = async (req, res, next) => {
   }
 };
 
-// Update notice
+// Update notice - UPDATED
 export const updateNotice = async (req, res, next) => {
   try {
     // Validate ID
@@ -279,12 +298,20 @@ export const updateNotice = async (req, res, next) => {
       { new: true, runValidators: true }
     ).populate({
       path: "publishedBy",
-      select: "username profilePicture",
+      select: "firstName lastName username profilePicture",
     });
+
+    // Transform notice to include fullName
+    const noticeObj = updatedNotice.toObject();
+    if (noticeObj.publishedBy) {
+      noticeObj.publishedBy.fullName = 
+        `${noticeObj.publishedBy.firstName || ''} ${noticeObj.publishedBy.lastName || ''}`.trim() || 
+        noticeObj.publishedBy.username;
+    }
 
     res.status(200).json({
       success: true,
-      data: updatedNotice,
+      data: noticeObj,
     });
   } catch (error) {
     console.error("Update notice error:", error);
@@ -292,7 +319,7 @@ export const updateNotice = async (req, res, next) => {
   }
 };
 
-// Delete notice (soft delete)
+// Delete notice (soft delete) - unchanged
 export const deleteNotice = async (req, res, next) => {
   try {
     // Validate ID
@@ -332,7 +359,6 @@ export const deleteNotice = async (req, res, next) => {
     }
 
     // Soft delete by setting isActive to false
-    // await notice.deleteOne(); // Hard delete
     notice.isActive = false;
     await notice.save();
 
@@ -346,7 +372,7 @@ export const deleteNotice = async (req, res, next) => {
   }
 };
 
-// Get notice statistics (for dashboard)
+// Get notice statistics (for dashboard) - unchanged
 export const getNoticeStats = async (req, res, next) => {
   try {
     const stats = await Notice.aggregate([
