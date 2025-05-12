@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Loader2,
   RefreshCw,
+  User,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
@@ -585,70 +586,67 @@ export default function ComplaintsManagementPage() {
                   </div>
                 )}
 
-                {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-lg text-gray-900 dark:text-white">Conversation</h3>
-                    <div className="space-y-3">
-                      {selectedComplaint.comments.map((comment) => (
-                        <div
-                          key={comment._id}
-                          className={`p-4 rounded-lg border ${
-                            comment.author?.role === "admin"
-                              ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
-                              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <Avatar className="h-10 w-10 border border-gray-200 dark:border-gray-700">
-                              <AvatarImage
-                                src={
-                                  comment.author?.profilePicture ||
-                                  `https://ui-avatars.com/api/?name=${comment.author?.name}&background=random`
-                                }
-                                alt={comment.author?.name}
-                              />
-                              <AvatarFallback
-                                className={
-                                  comment.author?.role === "admin"
-                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-                                    : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                                }
-                              >
-                                {comment.author?.name?.charAt(0).toUpperCase() || "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-baseline flex-wrap gap-2">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium text-gray-900 dark:text-white truncate">
-                                    {comment.author?.name || (comment.author?.role === "admin" ? "Admin" : "Student")}
-                                  </p>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-xs px-1.5 py-0.5 ${
-                                      comment.author?.role === "admin"
-                                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-                                        : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700"
-                                    }`}
-                                  >
-                                    {comment.author?.role === "admin" ? "Admin" : "Student"}
-                                  </Badge>
-                                </div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0 whitespace-nowrap">
-                                  {formatDate(comment.createdAt)}
-                                </span>
-                              </div>
-                              <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
-                                {comment.text}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+                 {selectedComplaint.comments && selectedComplaint.comments.length > 0 && (
+  <div className="space-y-4">
+    <h3 className="font-medium text-gray-900 dark:text-white">Conversation</h3>
+    <div className="space-y-3">
+      {selectedComplaint.comments.map((comment) => (
+        <div 
+          key={comment._id} 
+          className={`p-4 rounded-lg border ${
+            comment.author?.role === 'admin' 
+              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <Avatar className="h-10 w-10 border border-gray-200 dark:border-gray-600">
+              {comment.author?.profilePicture ? (
+                <AvatarImage 
+                  src={comment.author.profilePicture}
+                  alt={comment.author?.name || 'User'}
+                  className="object-cover"
+                />
+              ) : (
+                <div className="h-full w-full rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <User className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />
+                </div>
+              )}
+              <AvatarFallback className="bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-white">
+                {comment.author?.name?.charAt(0).toUpperCase() }
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-baseline">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-gray-900 dark:text-white truncate">
+                    {comment.author?.name || (comment.author?.role === 'admin' ? 'Admin' : 'Student')}
+                  </p>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs px-1.5 py-0.5 ${
+                      comment.author?.role === 'admin'
+                        ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                        : "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                    }`}
+                  >
+                    {comment.author?.role === 'admin' ? 'Admin' : 'Student'}
+                  </Badge>
+                </div>
+                <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">
+                  {formatDate(comment.createdAt)}
+                </span>
+              </div>
+              <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
+                {comment.text}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
                 <div className="space-y-2">
                   <h3 className="font-medium text-lg text-gray-900 dark:text-white">Add Comment</h3>
                   <div className="space-y-3">

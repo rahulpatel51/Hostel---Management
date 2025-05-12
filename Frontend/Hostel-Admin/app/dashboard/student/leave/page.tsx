@@ -11,119 +11,138 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, addDays, isBefore, isAfter } from "date-fns";
+import { format, isBefore } from "date-fns";
 
-type LeaveApplication = {
-  id: string;
-  fromDate: Date;
-  toDate: Date;
+interface LeaveApplication {
+  _id: string;
+  student: string;
+  leaveType: string;
+  startDate: Date;
+  endDate: Date;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  actionDate?: Date;
-  wardenComment?: string;
-};
+  destination: string;
+  contactDuringLeave: string;
+  parentApproval: boolean;
+  documents: string[];
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  approvedBy?: string;
+  approvalDate?: Date;
+  remarks?: string;
+  actualReturnDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LeaveFormData {
+  leaveType: string;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  reason: string;
+  destination: string;
+  contactDuringLeave: string;
+  parentApproval: boolean;
+}
 
 export default function StudentLeavePage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'cancelled'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newLeave, setNewLeave] = useState({
-    fromDate: undefined as Date | undefined,
-    toDate: undefined as Date | undefined,
-    reason: ''
+  const [newLeave, setNewLeave] = useState<LeaveFormData>({
+    leaveType: 'home',
+    startDate: undefined,
+    endDate: undefined,
+    reason: '',
+    destination: '',
+    contactDuringLeave: '',
+    parentApproval: false
   });
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Remove time part for accurate date comparison
+  today.setHours(0, 0, 0, 0);
 
-  // Calculate duration in days
-  const calculateDuration = (from: Date, to: Date) => {
+  const calculateDuration = (from: Date, to: Date): string => {
     const diffTime = Math.abs(to.getTime() - from.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
   };
 
-  // Date validation
-  const validateDates = (from: Date | undefined, to: Date | undefined) => {
+  const validateDates = (from: Date | undefined, to: Date | undefined): boolean => {
     if (!from || !to) return false;
-    
-    // From date must be today or later
     if (isBefore(from, today)) return false;
-    
-    // To date must be after from date
     if (isBefore(to, from)) return false;
-    
     return true;
   };
 
-  // Fetch leave applications
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const mockData: LeaveApplication[] = [
-          {
-            id: '1',
-            fromDate: addDays(today, 5),
-            toDate: addDays(today, 7),
-            reason: 'Family wedding in hometown',
-            status: 'approved',
-            actionDate: addDays(today, 3),
-            wardenComment: 'Approved. Have a safe journey.'
-          },
-          {
-            id: '2',
-            fromDate: addDays(today, 10),
-            toDate: addDays(today, 12),
-            reason: 'Medical checkup at hospital',
-            status: 'pending'
-          },
-          {
-            id: '3',
-            fromDate: addDays(today, -5),
-            toDate: addDays(today, -3),
-            reason: 'Personal family matter',
-            status: 'rejected',
-            actionDate: addDays(today, -7),
-            wardenComment: 'Rejected. Please provide more details.'
-          }
-        ];
-        
-        setLeaveApplications(mockData);
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load leave applications",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchLeaveApplications = async () => {
+  setIsLoading(true);
+  try {
+    const response = await fetch('http://localhost:5000/api/student/leave', {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch leave applications');
+    }
+    
+    const data = await response.json();
+    
+    // Debugging: log the received data
+    console.log('Received data:', data);
+    
+    // Check if data is an array or if it's an object containing an array
+    let applications = Array.isArray(data) ? data : data.data || data.applications || [];
+    
+    if (!Array.isArray(applications)) {
+      throw new Error('Invalid data format: expected an array of leave applications');
+    }
 
-    fetchData();
-  }, [toast]);
+    const formattedData = applications.map((app: any) => ({
+      ...app,
+      startDate: new Date(app.startDate),
+      endDate: new Date(app.endDate),
+      createdAt: new Date(app.createdAt),
+      updatedAt: new Date(app.updatedAt),
+      ...(app.approvalDate && { approvalDate: new Date(app.approvalDate) }),
+      ...(app.actualReturnDate && { actualReturnDate: new Date(app.actualReturnDate) })
+    }));
+
+    setLeaveApplications(formattedData);
+  } catch (error) {
+    console.error('Error fetching leave applications:', error);
+    setLeaveApplications([]);
+    toast({
+      title: "Error",
+      description: "Failed to load leave applications",
+      variant: "destructive"
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  useEffect(() => {
+    fetchLeaveApplications();
+  }, []);
 
   const filteredApplications = leaveApplications.filter(app => 
     activeTab === 'all' ? true : app.status === activeTab
   );
 
-  const handleSubmitLeave = () => {
-    if (!newLeave.fromDate || !newLeave.toDate || !newLeave.reason) {
+  const handleSubmitLeave = async () => {
+    if (!newLeave.startDate || !newLeave.endDate || !newLeave.reason || 
+        !newLeave.destination || !newLeave.contactDuringLeave) {
       toast({
         title: "Error",
-        description: "Please fill all fields",
+        description: "Please fill all required fields",
         variant: "destructive"
       });
       return;
     }
 
-    if (!validateDates(newLeave.fromDate, newLeave.toDate)) {
+    if (!validateDates(newLeave.startDate, newLeave.endDate)) {
       toast({
         title: "Error",
         description: "Invalid date selection. Please check your dates.",
@@ -134,85 +153,103 @@ export default function StudentLeavePage() {
 
     setIsLoading(true);
     try {
-      setTimeout(() => {
-        if (editingId) {
-          // Update existing application
-          setLeaveApplications(prev => prev.map(app => 
-            app.id === editingId ? {
-              ...app,
-              fromDate: newLeave.fromDate!,
-              toDate: newLeave.toDate!,
-              reason: newLeave.reason,
-              status: 'pending'
-            } : app
-          ));
-          toast({
-            title: "Success",
-            description: "Leave application updated",
-          });
-        } else {
-          // Create new application
-          const newApplication: LeaveApplication = {
-            id: `L${leaveApplications.length + 1}`,
-            fromDate: newLeave.fromDate!,
-            toDate: newLeave.toDate!,
-            reason: newLeave.reason,
-            status: 'pending'
-          };
-          setLeaveApplications(prev => [newApplication, ...prev]);
-          toast({
-            title: "Success",
-            description: "Leave application submitted",
-          });
-        }
+      const url = editingId 
+        ? `http://localhost:5000/api/student/leave/${editingId}`
+        : 'http://localhost:5000/api/student/leave';
+      
+      const method = editingId ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          leaveType: newLeave.leaveType,
+          startDate: newLeave.startDate,
+          endDate: newLeave.endDate,
+          reason: newLeave.reason,
+          destination: newLeave.destination,
+          contactDuringLeave: newLeave.contactDuringLeave,
+          parentApproval: newLeave.parentApproval,
+          status: 'pending'
+        })
+      });
 
-        // Reset form
-        setNewLeave({
-          fromDate: undefined,
-          toDate: undefined,
-          reason: ''
-        });
-        setIsCreating(false);
-        setEditingId(null);
-        setIsLoading(false);
-      }, 500);
+      if (!response.ok) {
+        throw new Error(editingId ? 'Failed to update leave application' : 'Failed to submit leave application');
+      }
+
+      await fetchLeaveApplications();
+      
+      toast({
+        title: "Success",
+        description: editingId ? "Leave application updated successfully" : "Leave application submitted successfully",
+      });
+
+      setNewLeave({
+        leaveType: 'home',
+        startDate: undefined,
+        endDate: undefined,
+        reason: '',
+        destination: '',
+        contactDuringLeave: '',
+        parentApproval: false
+      });
+      setIsCreating(false);
+      setEditingId(null);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to submit application",
+        description: error instanceof Error ? error.message : 'An error occurred',
         variant: "destructive"
       });
+    } finally {
       setIsLoading(false);
     }
   };
 
   const handleEdit = (app: LeaveApplication) => {
     setNewLeave({
-      fromDate: app.fromDate,
-      toDate: app.toDate,
-      reason: app.reason
+      leaveType: app.leaveType,
+      startDate: app.startDate,
+      endDate: app.endDate,
+      reason: app.reason,
+      destination: app.destination,
+      contactDuringLeave: app.contactDuringLeave,
+      parentApproval: app.parentApproval
     });
-    setEditingId(app.id);
+    setEditingId(app._id);
     setIsCreating(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this leave application?')) return;
+    
     setIsLoading(true);
     try {
-      setTimeout(() => {
-        setLeaveApplications(prev => prev.filter(app => app.id !== id));
-        toast({
-          title: "Success",
-          description: "Leave application deleted",
-        });
-        setIsLoading(false);
-      }, 500);
+      const response = await fetch(`http://localhost:5000/api/student/leave/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete leave application');
+      }
+      
+      await fetchLeaveApplications();
+      toast({
+        title: "Success",
+        description: "Leave application deleted successfully",
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete application",
+        description: error instanceof Error ? error.message : 'Failed to delete application',
         variant: "destructive"
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -221,9 +258,13 @@ export default function StudentLeavePage() {
     setIsCreating(false);
     setEditingId(null);
     setNewLeave({
-      fromDate: undefined,
-      toDate: undefined,
-      reason: ''
+      leaveType: 'home',
+      startDate: undefined,
+      endDate: undefined,
+      reason: '',
+      destination: '',
+      contactDuringLeave: '',
+      parentApproval: false
     });
   };
 
@@ -237,12 +278,24 @@ export default function StudentLeavePage() {
         return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
           <XCircle className="h-3 w-3 mr-1" /> Rejected
         </Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300">
+          Cancelled
+        </Badge>;
       default:
         return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
           Pending
         </Badge>;
     }
   };
+
+  const leaveTypeOptions = [
+    { value: 'home', label: 'Home Leave' },
+    { value: 'medical', label: 'Medical Leave' },
+    { value: 'academic', label: 'Academic Leave' },
+    { value: 'emergency', label: 'Emergency Leave' },
+    { value: 'other', label: 'Other' }
+  ];
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto px-4 py-8">
@@ -266,7 +319,6 @@ export default function StudentLeavePage() {
         </div>
       </div>
 
-      {/* Leave Request Form */}
       {isCreating && (
         <Card className="border-blue-200 dark:border-blue-800 shadow-sm">
           <CardHeader>
@@ -278,7 +330,42 @@ export default function StudentLeavePage() {
             <div className="grid gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium">From Date</label>
+                  <label className="block text-sm font-medium">Leave Type</label>
+                  <label htmlFor="leaveType" className="block text-sm font-medium">Leave Type</label>
+                  <select
+                    id="leaveType"
+                    value={newLeave.leaveType}
+                    onChange={(e) => setNewLeave({...newLeave, leaveType: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {leaveTypeOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Parent Approval</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="parentApproval"
+                      checked={newLeave.parentApproval}
+                      onChange={(e) => setNewLeave({...newLeave, parentApproval: e.target.checked})}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="parentApproval" className="text-sm font-medium leading-none">
+                      Parent has approved this leave
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Start Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -286,20 +373,19 @@ export default function StudentLeavePage() {
                         className="w-full justify-start text-left font-normal"
                       >
                         <CalendarDays className="mr-2 h-4 w-4" />
-                        {newLeave.fromDate ? format(newLeave.fromDate, "PPP") : <span>Select date</span>}
+                        {newLeave.startDate ? format(newLeave.startDate, "PPP") : <span>Select date</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={newLeave.fromDate}
+                        selected={newLeave.startDate}
                         onSelect={(date) => {
                           if (date) {
                             setNewLeave(prev => ({
                               ...prev,
-                              fromDate: date,
-                              // Reset toDate if it's now before fromDate
-                              toDate: prev.toDate && isBefore(prev.toDate, date) ? undefined : prev.toDate
+                              startDate: date,
+                              endDate: prev.endDate && isBefore(prev.endDate, date) ? undefined : prev.endDate
                             }));
                           }
                         }}
@@ -308,60 +394,84 @@ export default function StudentLeavePage() {
                       />
                     </PopoverContent>
                   </Popover>
-                  {newLeave.fromDate && isBefore(newLeave.fromDate, today) && (
-                    <p className="text-sm text-red-500">From date cannot be in the past</p>
+                  {newLeave.startDate && isBefore(newLeave.startDate, today) && (
+                    <p className="text-sm text-red-500">Start date cannot be in the past</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium">To Date</label>
+                  <label className="block text-sm font-medium">End Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className="w-full justify-start text-left font-normal"
-                        disabled={!newLeave.fromDate}
+                        disabled={!newLeave.startDate}
                       >
                         <CalendarDays className="mr-2 h-4 w-4" />
-                        {newLeave.toDate ? format(newLeave.toDate, "PPP") : <span>Select date</span>}
+                        {newLeave.endDate ? format(newLeave.endDate, "PPP") : <span>Select date</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={newLeave.toDate}
-                        onSelect={(date) => date && setNewLeave(prev => ({ ...prev, toDate: date }))}
+                        selected={newLeave.endDate}
+                        onSelect={(date) => date && setNewLeave(prev => ({ ...prev, endDate: date }))}
                         disabled={(date) => 
-                          !newLeave.fromDate || 
-                          isBefore(date, newLeave.fromDate) ||
+                          !newLeave.startDate || 
+                          isBefore(date, newLeave.startDate) ||
                           isBefore(date, today)
                         }
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
-                  {newLeave.toDate && newLeave.fromDate && isBefore(newLeave.toDate, newLeave.fromDate) && (
-                    <p className="text-sm text-red-500">To date must be after from date</p>
+                  {newLeave.endDate && newLeave.startDate && isBefore(newLeave.endDate, newLeave.startDate) && (
+                    <p className="text-sm text-red-500">End date must be after start date</p>
                   )}
                 </div>
               </div>
               
-              {newLeave.fromDate && newLeave.toDate && validateDates(newLeave.fromDate, newLeave.toDate) && (
+              {newLeave.startDate && newLeave.endDate && validateDates(newLeave.startDate, newLeave.endDate) && (
                 <div className="flex items-center gap-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-5 w-5 text-blue-600" />
                     <span className="font-medium">
-                      {format(newLeave.fromDate, 'MMM d')} - {format(newLeave.toDate, 'MMM d, yyyy')}
+                      {format(newLeave.startDate, 'MMM d')} - {format(newLeave.endDate, 'MMM d, yyyy')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-blue-600" />
                     <span className="font-medium">
-                      {calculateDuration(newLeave.fromDate, newLeave.toDate)}
+                      {calculateDuration(newLeave.startDate, newLeave.endDate)}
                     </span>
                   </div>
                 </div>
               )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Destination</label>
+                  <input
+                    type="text"
+                    value={newLeave.destination}
+                    onChange={(e) => setNewLeave({...newLeave, destination: e.target.value})}
+                    placeholder="Where will you be during leave?"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Contact During Leave</label>
+                  <input
+                    type="text"
+                    value={newLeave.contactDuringLeave}
+                    onChange={(e) => setNewLeave({...newLeave, contactDuringLeave: e.target.value})}
+                    placeholder="Phone number where you can be reached"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Reason for Leave</label>
@@ -382,10 +492,12 @@ export default function StudentLeavePage() {
               onClick={handleSubmitLeave}
               disabled={
                 isLoading || 
-                !newLeave.fromDate || 
-                !newLeave.toDate || 
+                !newLeave.startDate || 
+                !newLeave.endDate || 
                 !newLeave.reason ||
-                !validateDates(newLeave.fromDate, newLeave.toDate)
+                !newLeave.destination ||
+                !newLeave.contactDuringLeave ||
+                !validateDates(newLeave.startDate, newLeave.endDate)
               }
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -402,13 +514,13 @@ export default function StudentLeavePage() {
         </Card>
       )}
 
-      {/* Leave Applications Table */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-        <TabsList className="grid grid-cols-4">
+        <TabsList className="grid grid-cols-5">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="approved">Approved</TabsTrigger>
           <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
@@ -447,37 +559,43 @@ export default function StudentLeavePage() {
                   <Table>
                     <TableHeader className="bg-gray-50 dark:bg-gray-800">
                       <TableRow>
+                        <TableHead>Type</TableHead>
                         <TableHead>Date Range</TableHead>
                         <TableHead>Duration</TableHead>
-                        <TableHead>Reason</TableHead>
+                        <TableHead>Destination</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredApplications.map((leave) => (
-                        <TableRow key={leave.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                        <TableRow key={leave._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {leave.leaveType}
+                            </Badge>
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <CalendarDays className="h-4 w-4 text-blue-600" />
-                              {format(leave.fromDate, 'MMM d')} - {format(leave.toDate, 'MMM d, yyyy')}
+                              {format(leave.startDate, 'MMM d')} - {format(leave.endDate, 'MMM d, yyyy')}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-blue-600" />
-                              {calculateDuration(leave.fromDate, leave.toDate)}
+                              {calculateDuration(leave.startDate, leave.endDate)}
                             </div>
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {leave.reason}
+                          <TableCell>
+                            {leave.destination}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
                               {getStatusBadge(leave.status)}
-                              {leave.wardenComment && (
+                              {leave.remarks && (
                                 <p className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                  {leave.wardenComment}
+                                  {leave.remarks}
                                 </p>
                               )}
                             </div>
@@ -497,7 +615,7 @@ export default function StudentLeavePage() {
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
-                                    onClick={() => handleDelete(leave.id)}
+                                    onClick={() => handleDelete(leave._id)}
                                     className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                                   >
                                     <Trash2 className="h-4 w-4" />
