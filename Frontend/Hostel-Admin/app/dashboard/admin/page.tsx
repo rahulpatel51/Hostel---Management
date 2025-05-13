@@ -1132,7 +1132,7 @@ export default function AdminDashboard() {
               className="border-blue-300 text-blue-600 hover:bg-blue-50 flex items-center gap-1 shadow-sm"
               asChild
             >
-              <Link href="/dashboard/admin/notices/create">
+              <Link href="/dashboard/admin/notices">
                 <Plus className="h-4 w-4" /> Create Notice
               </Link>
             </Button>
@@ -1204,7 +1204,7 @@ export default function AdminDashboard() {
                         `}
                         asChild
                       >
-                        <Link href={`/dashboard/admin/notices/${notice._id}`}>Details</Link>
+                        <Link href={`/dashboard/admin/notices`}>Details</Link>
                       </Button>
                     </div>
                   </div>

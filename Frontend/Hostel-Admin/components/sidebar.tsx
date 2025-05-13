@@ -44,7 +44,7 @@ export function Sidebar({ role }: SidebarProps) {
     { name: "Mess Menu", href: "/dashboard/student/mess", icon: Utensils },
     { name: "Leave Application", href: "/dashboard/student/leave", icon: Calendar },
     { name: "Complaints", href: "/dashboard/student/complaints", icon: MessageSquare },
-    { name: "Disciplinary Actions", href: "/dashboard/student/discipline", icon: ClipboardList },
+    // { name: "Disciplinary Actions", href: "/dashboard/student/discipline", icon: ClipboardList },
     { name: "Notices", href: "/dashboard/student/notices", icon: Bell },
     { name: "Profile", href: "/dashboard/student/profile", icon: Settings },
     // { name: "Account Settings", href: "/dashboard/student/account-settings", icon: UserCog }

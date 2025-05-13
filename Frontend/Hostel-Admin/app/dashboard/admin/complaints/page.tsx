@@ -125,14 +125,14 @@ export default function ComplaintsManagementPage() {
         credentials: "include",
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch complaint details")
-      }
+      // if (!response.ok) {
+      //   throw new Error("Failed to fetch complaint details")
+      // }
 
       const data = await response.json()
       setSelectedComplaint(data)
     } catch (error: any) {
-      console.error("Error fetching details:", error)
+      // console.error("Error fetching details:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to load complaint details",
