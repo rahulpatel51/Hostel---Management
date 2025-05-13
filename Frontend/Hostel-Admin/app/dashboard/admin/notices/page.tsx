@@ -23,7 +23,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertCircle,
-  Bell,
   Calendar,
   CheckCircle2,
   ClipboardList,
@@ -34,19 +33,15 @@ import {
   Filter,
   Info,
   Loader2,
-  Mail,
-  MessageSquare,
   MoreHorizontal,
   PanelLeft,
   Plus,
   Search,
   Send,
-  Smartphone,
   Tag,
   Trash2,
   Upload,
   Users,
-  Archive,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -150,17 +145,8 @@ export default function NoticesPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isNotifyDialogOpen, setIsNotifyDialogOpen] = useState(false)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null)
-
-  // Notification options
-  const [notificationOptions, setNotificationOptions] = useState({
-    email: true,
-    sms: false,
-    push: true,
-    customMessage: "",
-  })
 
   // Fetch notices from backend
   useEffect(() => {
@@ -189,9 +175,7 @@ export default function NoticesPage() {
     const matchesCategory =
       selectedCategory === "all" || notice.category.toLowerCase() === selectedCategory.toLowerCase()
 
-    const matchesTab = activeTab === "all" ? notice.isActive : activeTab === "archive" ? !notice.isActive : true
-
-    return matchesSearch && matchesCategory && matchesTab
+    return matchesSearch && matchesCategory && notice.isActive
   })
 
   const handleCreateNotice = async () => {
@@ -284,8 +268,8 @@ export default function NoticesPage() {
       const { data } = await api.patch(`/${noticeId}/status`, { isActive })
       if (data.success) {
         setNotices(notices.map((notice) => (notice._id === noticeId ? { ...notice, isActive } : notice)))
-        toast.success(`Notice ${isActive ? "activated" : "archived"}`, {
-          description: isActive ? "The notice is now visible to users." : "The notice has been moved to the archive.",
+        toast.success(`Notice ${isActive ? "activated" : "deactivated"}`, {
+          description: isActive ? "The notice is now visible to users." : "The notice has been deactivated.",
         })
       }
     } catch (error) {
@@ -348,25 +332,6 @@ export default function NoticesPage() {
     toast.success("Attachment removed", {
       description: "The file has been removed from this notice.",
     })
-  }
-
-  const sendNotifications = async () => {
-    if (!selectedNotice) return
-
-    try {
-      setIsSubmitting(true)
-      const { data } = await api.post(`/${selectedNotice._id}/notify`, notificationOptions)
-      if (data.success) {
-        toast.success("Notifications sent successfully", {
-          description: `Notifications have been sent to ${selectedNotice.targetAudience.join(", ")} via the selected channels.`,
-        })
-        setIsNotifyDialogOpen(false)
-      }
-    } catch (error) {
-      console.error("Error sending notifications:", error)
-    } finally {
-      setIsSubmitting(false)
-    }
   }
 
   const formatDate = (dateString: string) => {
@@ -436,70 +401,74 @@ export default function NoticesPage() {
   const getImportanceColor = (importance: string) => {
     switch (importance) {
       case "urgent":
-        return "text-red-500"
+        return "text-rose-400"
       case "important":
-        return "text-amber-500"
+        return "text-amber-400"
       default:
-        return "text-green-500"
+        return "text-emerald-400"
     }
   }
 
   if (isLoading && notices.length === 0) {
     return (
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-6 bg-[#121212]">
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-[300px]" />
-          <Skeleton className="h-5 w-[400px]" />
+          <Skeleton className="h-8 w-[300px] bg-gray-800" />
+          <Skeleton className="h-5 w-[400px] bg-gray-800" />
         </div>
         <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-10 w-full bg-gray-800" />
+          <Skeleton className="h-[400px] w-full bg-gray-800" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-background">
+    <div className="flex flex-col gap-6 p-6 text-gray-200 min-h-screen">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Notices Management</h1>
-        <p className="text-muted-foreground">Create and manage notices and announcements for your institution</p>
+        <h1 className="text-3xl font-bold tracking-tight text-purple-400 bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
+          Notices Management
+        </h1>
+        <p className="text-gray-400">Create and manage notices and announcements for your institution</p>
       </div>
 
       <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="all" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2 max-w-md bg-gray-900 border border-gray-800">
+          <TabsTrigger
+            value="all"
+            className="flex items-center gap-2 data-[state=active]:bg-purple-900/60 data-[state=active]:text-purple-300"
+          >
             <FileText className="h-4 w-4" />
             <span>All Notices</span>
           </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center gap-2">
+          <TabsTrigger
+            value="create"
+            className="flex items-center gap-2 data-[state=active]:bg-purple-900/60 data-[state=active]:text-purple-300"
+          >
             <Plus className="h-4 w-4" />
             <span>Create Notice</span>
-          </TabsTrigger>
-          <TabsTrigger value="archive" className="flex items-center gap-2">
-            <Archive className="h-4 w-4" />
-            <span>Archive</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-4 space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             <div className="relative w-full md:w-96">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
                 type="search"
                 placeholder="Search notices by title, content or ID..."
-                className="w-full pl-8"
+                className="w-full pl-8 bg-gray-900 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] bg-gray-900 border-gray-700 focus:ring-purple-500/30 focus:border-purple-500/50">
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-gray-900 border-gray-700">
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="general">General</SelectItem>
                   <SelectItem value="academic">Academic</SelectItem>
@@ -515,6 +484,7 @@ export default function NoticesPage() {
                   setSearchTerm("")
                   setSelectedCategory("all")
                 }}
+                className="border-gray-700 hover:bg-gray-800 text-gray-300"
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Reset Filters
@@ -522,18 +492,18 @@ export default function NoticesPage() {
             </div>
           </div>
 
-          <Card className="border-border/40 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+          <Card className="border-gray-800 bg-gray-900 shadow-xl overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between bg-gray-900/80 rounded-t-lg pb-4 border-b border-gray-800">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-purple-300">
+                  <FileText className="h-5 w-5 text-purple-400" />
                   All Notices
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-400">
                   Showing {filteredNotices.length} of {notices.length} notices
                 </CardDescription>
               </div>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2 border-gray-700 hover:bg-gray-800 text-gray-300">
                 <Download className="h-4 w-4" />
                 Export
               </Button>
@@ -542,27 +512,27 @@ export default function NoticesPage() {
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
                     <p>Loading notices...</p>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-b-lg">
                   <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Published</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                    <TableHeader className="bg-gray-900/50">
+                      <TableRow className="border-gray-800 hover:bg-transparent">
+                        <TableHead className="text-gray-400">Title</TableHead>
+                        <TableHead className="text-gray-400">Category</TableHead>
+                        <TableHead className="text-gray-400">Published</TableHead>
+                        <TableHead className="text-gray-400">Expires</TableHead>
+                        <TableHead className="text-gray-400">Status</TableHead>
+                        <TableHead className="text-right text-gray-400">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredNotices.length > 0 ? (
                         filteredNotices.map((notice) => (
-                          <TableRow key={notice._id} className="hover:bg-muted/50 transition-colors">
+                          <TableRow key={notice._id} className="border-gray-800 hover:bg-gray-800/50 transition-colors">
                             <TableCell className="font-medium max-w-[200px] truncate">
                               <div className="flex items-center gap-2">
                                 <span
@@ -574,35 +544,26 @@ export default function NoticesPage() {
                             <TableCell>
                               <Badge
                                 variant={getCategoryBadgeVariant(notice.category)}
-                                className="flex items-center gap-1.5 capitalize"
+                                className="flex items-center gap-1.5 capitalize bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700"
                               >
                                 {getCategoryIcon(notice.category)}
                                 {notice.category}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">{formatDate(notice.createdAt)}</div>
+                              <div className="text-sm text-gray-400">{formatDate(notice.createdAt)}</div>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">{formatDate(notice.expiryDate)}</div>
+                              <div className="text-sm text-gray-400">{formatDate(notice.expiryDate)}</div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Badge
-                                  variant={notice.isActive ? "default" : "secondary"}
-                                  className="flex items-center gap-1.5"
+                                  variant="default"
+                                  className="flex items-center gap-1.5 bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-800/50"
                                 >
-                                  {notice.isActive ? (
-                                    <>
-                                      <CheckCircle2 className="h-3 w-3" />
-                                      Active
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Archive className="h-3 w-3" />
-                                      Archived
-                                    </>
-                                  )}
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Active
                                 </Badge>
                               </div>
                             </TableCell>
@@ -610,18 +571,18 @@ export default function NoticesPage() {
                               <TooltipProvider>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="hover:bg-muted">
+                                    <Button variant="ghost" size="icon" className="hover:bg-gray-800">
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuContent align="end" className="w-48 bg-gray-900 border-gray-800">
+                                    <DropdownMenuLabel className="text-gray-400">Actions</DropdownMenuLabel>
                                     <DropdownMenuItem
                                       onClick={() => {
                                         setSelectedNotice(notice)
                                         setIsViewDialogOpen(true)
                                       }}
-                                      className="flex items-center cursor-pointer"
+                                      className="flex items-center cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
                                     >
                                       <Eye className="mr-2 h-4 w-4" />
                                       View
@@ -631,42 +592,23 @@ export default function NoticesPage() {
                                         setSelectedNotice({ ...notice })
                                         setIsEditDialogOpen(true)
                                       }}
-                                      className="flex items-center cursor-pointer"
+                                      className="flex items-center cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
                                     >
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => {
-                                        setSelectedNotice(notice)
-                                        setIsNotifyDialogOpen(true)
-                                      }}
-                                      className="flex items-center cursor-pointer"
-                                    >
-                                      <Bell className="mr-2 h-4 w-4" />
-                                      Notify
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => {
                                         toggleNoticeStatus(notice._id, !notice.isActive)
                                       }}
-                                      className="flex items-center cursor-pointer"
+                                      className="flex items-center cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
                                     >
-                                      {notice.isActive ? (
-                                        <>
-                                          <Archive className="mr-2 h-4 w-4" />
-                                          Archive
-                                        </>
-                                      ) : (
-                                        <>
-                                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                                          Activate
-                                        </>
-                                      )}
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Deactivate
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
+                                    <DropdownMenuSeparator className="bg-gray-800" />
                                     <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive flex items-center cursor-pointer"
+                                      className="text-rose-400 focus:text-rose-400 hover:bg-gray-800 focus:bg-gray-800 flex items-center cursor-pointer"
                                       onClick={() => {
                                         setSelectedNotice(notice)
                                         setIsDeleteDialogOpen(true)
@@ -682,13 +624,17 @@ export default function NoticesPage() {
                           </TableRow>
                         ))
                       ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                        <TableRow className="border-gray-800">
+                          <TableCell colSpan={6} className="text-center py-12 text-gray-400">
                             <div className="flex flex-col items-center gap-2">
-                              <Search className="h-8 w-8 text-muted-foreground/70" />
+                              <Search className="h-8 w-8 text-gray-600" />
                               <p className="text-lg font-medium">No notices found</p>
                               <p className="text-sm">Try adjusting your search or filters</p>
-                              <Button variant="outline" className="mt-2" onClick={() => setActiveTab("create")}>
+                              <Button
+                                variant="outline"
+                                className="mt-2 border-gray-700 text-purple-400 hover:bg-gray-800 hover:text-purple-300"
+                                onClick={() => setActiveTab("create")}
+                              >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create New Notice
                               </Button>
@@ -705,22 +651,24 @@ export default function NoticesPage() {
         </TabsContent>
 
         <TabsContent value="create" className="mt-4 space-y-6">
-          <Card className="border-border/40 shadow-sm">
-            <CardHeader className="bg-muted/30 rounded-t-lg">
+          <Card className="border-gray-800 bg-gray-900 shadow-xl overflow-hidden">
+            <CardHeader className="bg-gray-900/80 rounded-t-lg pb-4 border-b border-gray-800">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5 text-primary" />
+                  <CardTitle className="flex items-center gap-2 text-purple-300">
+                    <Plus className="h-5 w-5 text-purple-400" />
                     Create New Notice
                   </CardTitle>
-                  <CardDescription>Fill out the form below to create a new notice</CardDescription>
+                  <CardDescription className="text-gray-400">
+                    Fill out the form below to create a new notice
+                  </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsPreviewMode(!isPreviewMode)}
-                    className="gap-2"
+                    className="gap-2 border-gray-700 hover:bg-gray-800 text-gray-300"
                   >
                     {isPreviewMode ? (
                       <>
@@ -737,9 +685,9 @@ export default function NoticesPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className={cn("space-y-6", isPreviewMode ? "hidden" : "block")}>
+            <CardContent className={cn("space-y-6 p-6", isPreviewMode ? "hidden" : "block")}>
               <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-medium">
+                <Label htmlFor="title" className="text-sm font-medium text-gray-300">
                   Notice Title *
                 </Label>
                 <Input
@@ -747,13 +695,13 @@ export default function NoticesPage() {
                   placeholder="Enter notice title"
                   value={newNotice.title}
                   onChange={(e) => setNewNotice({ ...newNotice, title: e.target.value })}
-                  className="border-border/60 focus-visible:ring-primary/20"
+                  className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 />
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium">
+                  <Label htmlFor="category" className="text-sm font-medium text-gray-300">
                     Category *
                   </Label>
                   <Select
@@ -765,32 +713,35 @@ export default function NoticesPage() {
                       })
                     }
                   >
-                    <SelectTrigger id="category" className="border-border/60 focus-visible:ring-primary/20">
+                    <SelectTrigger
+                      id="category"
+                      className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
+                    >
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-900 border-gray-800">
                       <SelectItem value="general" className="flex items-center gap-2">
-                        <Info className="h-4 w-4" />
+                        <Info className="h-4 w-4 text-purple-400" />
                         <span>General</span>
                       </SelectItem>
                       <SelectItem value="academic" className="flex items-center gap-2">
-                        <ClipboardList className="h-4 w-4" />
+                        <ClipboardList className="h-4 w-4 text-purple-400" />
                         <span>Academic</span>
                       </SelectItem>
                       <SelectItem value="hostel" className="flex items-center gap-2">
-                        <PanelLeft className="h-4 w-4" />
+                        <PanelLeft className="h-4 w-4 text-purple-400" />
                         <span>Hostel</span>
                       </SelectItem>
                       <SelectItem value="event" className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
+                        <Calendar className="h-4 w-4 text-purple-400" />
                         <span>Event</span>
                       </SelectItem>
                       <SelectItem value="emergency" className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" />
+                        <AlertCircle className="h-4 w-4 text-rose-400" />
                         <span>Emergency</span>
                       </SelectItem>
                       <SelectItem value="other" className="flex items-center gap-2">
-                        <Tag className="h-4 w-4" />
+                        <Tag className="h-4 w-4 text-purple-400" />
                         <span>Other</span>
                       </SelectItem>
                     </SelectContent>
@@ -798,7 +749,7 @@ export default function NoticesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="importance" className="text-sm font-medium">
+                  <Label htmlFor="importance" className="text-sm font-medium text-gray-300">
                     Importance *
                   </Label>
                   <Select
@@ -810,20 +761,23 @@ export default function NoticesPage() {
                       })
                     }
                   >
-                    <SelectTrigger id="importance" className="border-border/60 focus-visible:ring-primary/20">
+                    <SelectTrigger
+                      id="importance"
+                      className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
+                    >
                       <SelectValue placeholder="Select importance level" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-900 border-gray-800">
                       <SelectItem value="normal" className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                        <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
                         <span>Normal</span>
                       </SelectItem>
                       <SelectItem value="important" className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                        <span className="h-2 w-2 rounded-full bg-amber-400"></span>
                         <span>Important</span>
                       </SelectItem>
                       <SelectItem value="urgent" className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                        <span className="h-2 w-2 rounded-full bg-rose-400"></span>
                         <span>Urgent</span>
                       </SelectItem>
                     </SelectContent>
@@ -832,7 +786,7 @@ export default function NoticesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Target Audience *</Label>
+                <Label className="text-sm font-medium text-gray-300">Target Audience *</Label>
                 <div className="flex flex-wrap gap-2">
                   <TooltipProvider>
                     <Tooltip>
@@ -841,13 +795,18 @@ export default function NoticesPage() {
                           variant={isAudienceSelected("all") ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleAudienceChange("all")}
-                          className="gap-1.5"
+                          className={cn(
+                            "gap-1.5",
+                            isAudienceSelected("all")
+                              ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                              : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                          )}
                         >
                           <Users className="h-3.5 w-3.5" />
                           All
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
+                      <TooltipContent className="bg-gray-900 border-gray-800">
                         <p>Send to everyone</p>
                       </TooltipContent>
                     </Tooltip>
@@ -860,13 +819,18 @@ export default function NoticesPage() {
                           variant={isAudienceSelected("students") ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleAudienceChange("students")}
-                          className="gap-1.5"
+                          className={cn(
+                            "gap-1.5",
+                            isAudienceSelected("students")
+                              ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                              : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                          )}
                         >
                           <Users className="h-3.5 w-3.5" />
                           Students
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
+                      <TooltipContent className="bg-gray-900 border-gray-800">
                         <p>Send to students only</p>
                       </TooltipContent>
                     </Tooltip>
@@ -879,13 +843,18 @@ export default function NoticesPage() {
                           variant={isAudienceSelected("wardens") ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleAudienceChange("wardens")}
-                          className="gap-1.5"
+                          className={cn(
+                            "gap-1.5",
+                            isAudienceSelected("wardens")
+                              ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                              : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                          )}
                         >
                           <Users className="h-3.5 w-3.5" />
                           Wardens
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
+                      <TooltipContent className="bg-gray-900 border-gray-800">
                         <p>Send to wardens only</p>
                       </TooltipContent>
                     </Tooltip>
@@ -898,13 +867,18 @@ export default function NoticesPage() {
                           variant={isAudienceSelected("admin") ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleAudienceChange("admin")}
-                          className="gap-1.5"
+                          className={cn(
+                            "gap-1.5",
+                            isAudienceSelected("admin")
+                              ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                              : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                          )}
                         >
                           <Users className="h-3.5 w-3.5" />
                           Admin
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
+                      <TooltipContent className="bg-gray-900 border-gray-800">
                         <p>Send to administrators only</p>
                       </TooltipContent>
                     </Tooltip>
@@ -913,43 +887,43 @@ export default function NoticesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expiryDate" className="text-sm font-medium">
+                <Label htmlFor="expiryDate" className="text-sm font-medium text-gray-300">
                   Expiry Date *
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Calendar className="h-4 w-4 text-purple-400" />
                   <Input
                     type="date"
                     id="expiryDate"
                     min={new Date().toISOString().split("T")[0]}
                     value={newNotice.expiryDate}
                     onChange={(e) => setNewNotice({ ...newNotice, expiryDate: e.target.value })}
-                    className="border-border/60 focus-visible:ring-primary/20"
+                    className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="content" className="text-sm font-medium">
+                <Label htmlFor="content" className="text-sm font-medium text-gray-300">
                   Notice Content *
                 </Label>
                 <Textarea
                   id="content"
                   placeholder="Enter notice content here..."
-                  className="min-h-[200px] border-border/60 focus-visible:ring-primary/20"
+                  className="min-h-[200px] bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                   value={newNotice.content}
                   onChange={(e) => setNewNotice({ ...newNotice, content: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Attachments</Label>
+                <Label className="text-sm font-medium text-gray-300">Attachments</Label>
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-2">
                     <label
                       htmlFor="attachment"
                       className={cn(
-                        "cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2",
+                        "cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-purple-600 text-white hover:bg-purple-700 h-10 px-4 py-2",
                         isUploading && "opacity-70 pointer-events-none",
                       )}
                     >
@@ -974,21 +948,21 @@ export default function NoticesPage() {
                     </label>
                     {isUploading && (
                       <div className="flex-1">
-                        <Progress value={uploadProgress} className="h-2" />
-                        <p className="text-xs text-muted-foreground mt-1">{uploadProgress}% uploaded</p>
+                        <Progress value={uploadProgress} className="h-2 bg-gray-800" />
+                        <p className="text-xs text-gray-400 mt-1">{uploadProgress}% uploaded</p>
                       </div>
                     )}
                   </div>
 
                   {newNotice.attachments.length > 0 && (
-                    <div className="border rounded-lg divide-y">
+                    <div className="border border-gray-800 rounded-lg divide-y divide-gray-800">
                       {newNotice.attachments.map((attachment, index) => (
                         <div
                           key={index}
-                          className="p-3 flex justify-between items-center hover:bg-muted/50 transition-colors"
+                          className="p-3 flex justify-between items-center hover:bg-gray-800 transition-colors"
                         >
                           <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <FileText className="h-4 w-4 text-purple-400" />
                             <span className="text-sm font-medium truncate max-w-[200px]">
                               {attachment.split("/").pop()}
                             </span>
@@ -997,7 +971,7 @@ export default function NoticesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => removeAttachment(index)}
-                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="text-gray-400 hover:text-rose-400 hover:bg-gray-800 transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -1011,12 +985,12 @@ export default function NoticesPage() {
 
             {/* Preview Mode */}
             {isPreviewMode && (
-              <CardContent className="space-y-6 p-6 bg-white rounded-md">
+              <CardContent className="space-y-6 p-6 bg-gray-900 rounded-md">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Badge
                       variant={getCategoryBadgeVariant(newNotice.category)}
-                      className="flex items-center gap-1.5 capitalize"
+                      className="flex items-center gap-1.5 capitalize bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700"
                     >
                       {getCategoryIcon(newNotice.category)}
                       {newNotice.category}
@@ -1029,39 +1003,46 @@ export default function NoticesPage() {
                             ? "secondary"
                             : "outline"
                       }
-                      className="capitalize"
+                      className={cn(
+                        "capitalize",
+                        newNotice.importance === "urgent"
+                          ? "bg-rose-900/30 text-rose-400 hover:bg-rose-900/50 border border-rose-800/50"
+                          : newNotice.importance === "important"
+                            ? "bg-amber-900/30 text-amber-400 hover:bg-amber-900/50 border border-amber-800/50"
+                            : "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-800/50",
+                      )}
                     >
                       {newNotice.importance}
                     </Badge>
                   </div>
-                  <div className="text-sm text-muted-foreground">Expires: {formatDate(newNotice.expiryDate)}</div>
+                  <div className="text-sm text-gray-400">Expires: {formatDate(newNotice.expiryDate)}</div>
                 </div>
 
                 <div>
-                  <h2 className="text-xl font-bold">{newNotice.title || "Notice Title"}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">For: {newNotice.targetAudience.join(", ")}</p>
+                  <h2 className="text-xl font-bold text-purple-300">{newNotice.title || "Notice Title"}</h2>
+                  <p className="text-sm text-gray-400 mt-1">For: {newNotice.targetAudience.join(", ")}</p>
                 </div>
 
-                <Separator />
+                <Separator className="bg-gray-800" />
 
-                <div className="prose prose-sm max-w-none">
+                <div className="prose prose-sm max-w-none prose-headings:text-purple-300 prose-a:text-purple-400 prose-invert">
                   {newNotice.content ? (
                     newNotice.content.split("\n").map((paragraph, i) => <p key={i}>{paragraph}</p>)
                   ) : (
-                    <p className="text-muted-foreground italic">Notice content will appear here...</p>
+                    <p className="text-gray-500 italic">Notice content will appear here...</p>
                   )}
                 </div>
 
                 {newNotice.attachments.length > 0 && (
                   <>
-                    <Separator />
+                    <Separator className="bg-gray-800" />
                     <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Attachments</h3>
+                      <h3 className="text-sm font-medium text-gray-300">Attachments</h3>
                       <div className="grid gap-2">
                         {newNotice.attachments.map((attachment, index) => (
                           <div
                             key={index}
-                            className="flex items-center gap-2 text-sm text-primary hover:underline p-2 border rounded-md hover:bg-muted/50 transition-colors"
+                            className="flex items-center gap-2 text-sm text-purple-400 hover:underline p-2 border border-gray-800 rounded-md hover:bg-gray-800 transition-colors"
                           >
                             <Download className="h-4 w-4" />
                             Attachment {index + 1} - {attachment.split("/").pop()}
@@ -1074,20 +1055,21 @@ export default function NoticesPage() {
               </CardContent>
             )}
 
-            <CardFooter className="flex justify-end gap-2 pt-4 pb-6 px-6 bg-muted/30 rounded-b-lg">
+            <CardFooter className="flex justify-end gap-2 pt-4 pb-6 px-6 bg-gray-900/80 rounded-b-lg border-t border-gray-800">
               <Button
                 variant="outline"
                 onClick={() => {
                   resetNewNoticeForm()
                   setActiveTab("all")
                 }}
+                className="border-gray-700 hover:bg-gray-800 text-gray-300"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateNotice}
                 disabled={!newNotice.title || !newNotice.content || isSubmitting}
-                className="gap-2"
+                className="gap-2 bg-purple-600 hover:bg-purple-700"
               >
                 {isSubmitting ? (
                   <>
@@ -1104,151 +1086,31 @@ export default function NoticesPage() {
             </CardFooter>
           </Card>
         </TabsContent>
-
-        <TabsContent value="archive" className="mt-4 space-y-6">
-          <Card className="border-border/40 shadow-sm">
-            <CardHeader className="bg-muted/30 rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <Archive className="h-5 w-5 text-primary" />
-                Archived Notices
-              </CardTitle>
-              <CardDescription>Past notices that have expired or been manually archived</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <p>Loading archived notices...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-b-lg">
-                  <Table>
-                    <TableHeader className="bg-muted/50">
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Published</TableHead>
-                        <TableHead>Expired</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {notices.filter((notice) => !notice.isActive).length > 0 ? (
-                        notices
-                          .filter((notice) => !notice.isActive)
-                          .map((notice) => (
-                            <TableRow key={notice._id} className="hover:bg-muted/50 transition-colors">
-                              <TableCell className="font-medium max-w-[200px] truncate">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={cn("h-2 w-2 rounded-full", getImportanceColor(notice.importance))}
-                                  ></span>
-                                  {notice.title}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={getCategoryBadgeVariant(notice.category)}
-                                  className="flex items-center gap-1.5 capitalize"
-                                >
-                                  {getCategoryIcon(notice.category)}
-                                  {notice.category}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="text-sm">{formatDate(notice.createdAt)}</div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="text-sm">{formatDate(notice.expiryDate)}</div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <TooltipProvider>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="hover:bg-muted">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          setSelectedNotice(notice)
-                                          setIsViewDialogOpen(true)
-                                        }}
-                                        className="flex items-center cursor-pointer"
-                                      >
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => toggleNoticeStatus(notice._id, true)}
-                                        className="flex items-center cursor-pointer"
-                                      >
-                                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                                        Activate
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        className="text-destructive focus:text-destructive flex items-center cursor-pointer"
-                                        onClick={() => {
-                                          setSelectedNotice(notice)
-                                          setIsDeleteDialogOpen(true)
-                                        }}
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TooltipProvider>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                            <div className="flex flex-col items-center gap-2">
-                              <Archive className="h-8 w-8 text-muted-foreground/70" />
-                              <p className="text-lg font-medium">No archived notices found</p>
-                              <p className="text-sm">Notices will appear here when archived</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* View Notice Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0">
-          <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="text-xl">{selectedNotice?.title}</DialogTitle>
-            <DialogDescription className="flex items-center gap-2 mt-2">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0 border-gray-800 bg-gray-900">
+          <DialogHeader className="p-6 pb-2 bg-gray-900/80 border-b border-gray-800">
+            <DialogTitle className="text-xl text-purple-300">{selectedNotice?.title}</DialogTitle>
+            {/* Fix: Replace DialogDescription with div to avoid nesting Badge (div) inside p element */}
+            <div className="flex items-center gap-2 mt-2 text-gray-400">
               <Badge
                 variant={getCategoryBadgeVariant(selectedNotice?.category || "general")}
-                className="flex items-center gap-1.5 capitalize"
+                className="flex items-center gap-1.5 capitalize bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700"
               >
                 {getCategoryIcon(selectedNotice?.category || "general")}
                 {selectedNotice?.category}
               </Badge>
               <span>•</span>
               <span>Published: {selectedNotice && formatDate(selectedNotice.createdAt)}</span>
-            </DialogDescription>
+            </div>
           </DialogHeader>
           {selectedNotice && (
             <ScrollArea className="max-h-[calc(80vh-120px)]">
               <div className="space-y-4 p-6 pt-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="capitalize flex items-center gap-1.5">
+                  <Badge variant="outline" className="capitalize flex items-center gap-1.5 border-gray-700">
                     <Users className="h-3 w-3" />
                     {selectedNotice.targetAudience.join(", ")}
                   </Badge>
@@ -1260,34 +1122,30 @@ export default function NoticesPage() {
                           ? "secondary"
                           : "outline"
                     }
-                    className="capitalize"
+                    className={cn(
+                      "capitalize",
+                      selectedNotice.importance === "urgent"
+                        ? "bg-rose-900/30 text-rose-400 hover:bg-rose-900/50 border border-rose-800/50"
+                        : selectedNotice.importance === "important"
+                          ? "bg-amber-900/30 text-amber-400 hover:bg-amber-900/50 border border-amber-800/50"
+                          : "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-800/50",
+                    )}
                   >
                     {selectedNotice.importance}
                   </Badge>
                   <Badge
-                    variant={selectedNotice.isActive ? "default" : "secondary"}
-                    className="flex items-center gap-1.5"
+                    variant="default"
+                    className="flex items-center gap-1.5 bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-800/50"
                   >
-                    {selectedNotice.isActive ? (
-                      <>
-                        <CheckCircle2 className="h-3 w-3" />
-                        Active
-                      </>
-                    ) : (
-                      <>
-                        <Archive className="h-3 w-3" />
-                        Archived
-                      </>
-                    )}
+                    <CheckCircle2 className="h-3 w-3" />
+                    Active
                   </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Expires: {formatDate(selectedNotice.expiryDate)}
-                  </span>
+                  <span className="text-sm text-gray-400">Expires: {formatDate(selectedNotice.expiryDate)}</span>
                 </div>
 
-                <Separator />
+                <Separator className="bg-gray-800" />
 
-                <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="prose prose-sm prose-invert max-w-none">
                   {selectedNotice.content.split("\n").map((paragraph, i) => (
                     <p key={i}>{paragraph}</p>
                   ))}
@@ -1295,9 +1153,9 @@ export default function NoticesPage() {
 
                 {selectedNotice.attachments && selectedNotice.attachments.length > 0 && (
                   <>
-                    <Separator />
+                    <Separator className="bg-gray-800" />
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Attachments</Label>
+                      <Label className="text-sm font-medium text-gray-300">Attachments</Label>
                       <div className="grid gap-2">
                         {selectedNotice.attachments.map((attachment, index) => (
                           <a
@@ -1305,7 +1163,7 @@ export default function NoticesPage() {
                             href={attachment}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm text-primary hover:underline p-2 border rounded-md hover:bg-muted/50 transition-colors"
+                            className="flex items-center gap-2 text-sm text-purple-400 hover:underline p-2 border border-gray-800 rounded-md hover:bg-gray-800 transition-colors"
                           >
                             <Download className="h-4 w-4" />
                             Attachment {index + 1} - {attachment.split("/").pop()}
@@ -1316,23 +1174,29 @@ export default function NoticesPage() {
                   </>
                 )}
 
-                <Separator />
+                <Separator className="bg-gray-800" />
 
-                <div className="space-y-2 text-sm bg-muted/30 p-3 rounded-md">
+                <div className="space-y-2 text-sm bg-gray-800/50 p-3 rounded-md">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Published By:</span>
-                    <span className="font-medium">{selectedNotice.publishedBy?.fullName || "System"}</span>
+                    <span className="text-gray-400">Published By:</span>
+                    <span className="font-medium text-gray-300">
+                      {selectedNotice.publishedBy?.fullName || "System"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Updated:</span>
-                    <span className="font-medium">{formatDate(selectedNotice.updatedAt)}</span>
+                    <span className="text-gray-400">Last Updated:</span>
+                    <span className="font-medium text-gray-300">{formatDate(selectedNotice.updatedAt)}</span>
                   </div>
                 </div>
               </div>
             </ScrollArea>
           )}
-          <div className="flex justify-end gap-2 p-4 border-t bg-muted/30">
-            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-800 bg-gray-900/80">
+            <Button
+              variant="outline"
+              onClick={() => setIsViewDialogOpen(false)}
+              className="border-gray-700 hover:bg-gray-800 text-gray-300"
+            >
               Close
             </Button>
             <Button
@@ -1342,7 +1206,7 @@ export default function NoticesPage() {
                 setSelectedNotice({ ...selectedNotice! })
                 setIsEditDialogOpen(true)
               }}
-              className="gap-2"
+              className="gap-2 bg-purple-600 hover:bg-purple-700"
             >
               <Edit className="h-4 w-4" />
               Edit
@@ -1353,19 +1217,21 @@ export default function NoticesPage() {
 
       {/* Edit Notice Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0">
-          <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-primary" />
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0 border-gray-800 bg-gray-900">
+          <DialogHeader className="p-6 pb-2 bg-gray-900/80 border-b border-gray-800">
+            <DialogTitle className="flex items-center gap-2 text-purple-300">
+              <Edit className="h-5 w-5 text-purple-400" />
               Edit Notice
             </DialogTitle>
-            <DialogDescription>Make changes to the notice below. Click save when you're done.</DialogDescription>
+            <DialogDescription className="text-gray-400">
+              Make changes to the notice below. Click save when you're done.
+            </DialogDescription>
           </DialogHeader>
           {selectedNotice && (
             <ScrollArea className="max-h-[calc(80vh-180px)]">
               <div className="space-y-4 p-6 pt-2">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-title" className="text-sm font-medium">
+                  <Label htmlFor="edit-title" className="text-sm font-medium text-gray-300">
                     Title *
                   </Label>
                   <Input
@@ -1377,13 +1243,13 @@ export default function NoticesPage() {
                         title: e.target.value,
                       })
                     }
-                    className="border-border/60 focus-visible:ring-primary/20"
+                    className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                   />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-category" className="text-sm font-medium">
+                    <Label htmlFor="edit-category" className="text-sm font-medium text-gray-300">
                       Category *
                     </Label>
                     <Select
@@ -1395,32 +1261,35 @@ export default function NoticesPage() {
                         })
                       }
                     >
-                      <SelectTrigger id="edit-category" className="border-border/60 focus-visible:ring-primary/20">
+                      <SelectTrigger
+                        id="edit-category"
+                        className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
+                      >
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-gray-900 border-gray-800">
                         <SelectItem value="general" className="flex items-center gap-2">
-                          <Info className="h-4 w-4" />
+                          <Info className="h-4 w-4 text-purple-400" />
                           <span>General</span>
                         </SelectItem>
                         <SelectItem value="academic" className="flex items-center gap-2">
-                          <ClipboardList className="h-4 w-4" />
+                          <ClipboardList className="h-4 w-4 text-purple-400" />
                           <span>Academic</span>
                         </SelectItem>
                         <SelectItem value="hostel" className="flex items-center gap-2">
-                          <PanelLeft className="h-4 w-4" />
+                          <PanelLeft className="h-4 w-4 text-purple-400" />
                           <span>Hostel</span>
                         </SelectItem>
                         <SelectItem value="event" className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
+                          <Calendar className="h-4 w-4 text-purple-400" />
                           <span>Event</span>
                         </SelectItem>
                         <SelectItem value="emergency" className="flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4" />
+                          <AlertCircle className="h-4 w-4 text-rose-400" />
                           <span>Emergency</span>
                         </SelectItem>
                         <SelectItem value="other" className="flex items-center gap-2">
-                          <Tag className="h-4 w-4" />
+                          <Tag className="h-4 w-4 text-purple-400" />
                           <span>Other</span>
                         </SelectItem>
                       </SelectContent>
@@ -1428,7 +1297,7 @@ export default function NoticesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="edit-importance" className="text-sm font-medium">
+                    <Label htmlFor="edit-importance" className="text-sm font-medium text-gray-300">
                       Importance *
                     </Label>
                     <Select
@@ -1440,20 +1309,23 @@ export default function NoticesPage() {
                         })
                       }
                     >
-                      <SelectTrigger id="edit-importance" className="border-border/60 focus-visible:ring-primary/20">
+                      <SelectTrigger
+                        id="edit-importance"
+                        className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
+                      >
                         <SelectValue placeholder="Select importance" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-gray-900 border-gray-800">
                         <SelectItem value="normal" className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                          <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
                           <span>Normal</span>
                         </SelectItem>
                         <SelectItem value="important" className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                          <span className="h-2 w-2 rounded-full bg-amber-400"></span>
                           <span>Important</span>
                         </SelectItem>
                         <SelectItem value="urgent" className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                          <span className="h-2 w-2 rounded-full bg-rose-400"></span>
                           <span>Urgent</span>
                         </SelectItem>
                       </SelectContent>
@@ -1462,7 +1334,7 @@ export default function NoticesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Target Audience *</Label>
+                  <Label className="text-sm font-medium text-gray-300">Target Audience *</Label>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant={selectedNotice.targetAudience.includes("all") ? "default" : "outline"}
@@ -1473,7 +1345,12 @@ export default function NoticesPage() {
                           targetAudience: ["all"],
                         })
                       }
-                      className="gap-1.5"
+                      className={cn(
+                        "gap-1.5",
+                        selectedNotice.targetAudience.includes("all")
+                          ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                          : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                      )}
                     >
                       <Users className="h-3.5 w-3.5" />
                       All
@@ -1491,7 +1368,12 @@ export default function NoticesPage() {
                               : [...selectedNotice.targetAudience, "students"],
                         })
                       }
-                      className="gap-1.5"
+                      className={cn(
+                        "gap-1.5",
+                        selectedNotice.targetAudience.includes("students")
+                          ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                          : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                      )}
                     >
                       <Users className="h-3.5 w-3.5" />
                       Students
@@ -1509,7 +1391,12 @@ export default function NoticesPage() {
                               : [...selectedNotice.targetAudience, "wardens"],
                         })
                       }
-                      className="gap-1.5"
+                      className={cn(
+                        "gap-1.5",
+                        selectedNotice.targetAudience.includes("wardens")
+                          ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                          : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                      )}
                     >
                       <Users className="h-3.5 w-3.5" />
                       Wardens
@@ -1527,7 +1414,12 @@ export default function NoticesPage() {
                               : [...selectedNotice.targetAudience, "admin"],
                         })
                       }
-                      className="gap-1.5"
+                      className={cn(
+                        "gap-1.5",
+                        selectedNotice.targetAudience.includes("admin")
+                          ? "bg-purple-900/60 hover:bg-purple-900/80 text-purple-300 border-purple-700"
+                          : "border-gray-700 hover:bg-gray-800 text-gray-300",
+                      )}
                     >
                       <Users className="h-3.5 w-3.5" />
                       Admin
@@ -1536,11 +1428,11 @@ export default function NoticesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-expiry-date" className="text-sm font-medium">
+                  <Label htmlFor="edit-expiry-date" className="text-sm font-medium text-gray-300">
                     Expiry Date *
                   </Label>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Calendar className="h-4 w-4 text-purple-400" />
                     <Input
                       id="edit-expiry-date"
                       type="date"
@@ -1552,18 +1444,18 @@ export default function NoticesPage() {
                           expiryDate: e.target.value,
                         })
                       }
-                      className="border-border/60 focus-visible:ring-primary/20"
+                      className="bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-content" className="text-sm font-medium">
+                  <Label htmlFor="edit-content" className="text-sm font-medium text-gray-300">
                     Content *
                   </Label>
                   <Textarea
                     id="edit-content"
-                    className="min-h-[150px] border-border/60 focus-visible:ring-primary/20"
+                    className="min-h-[150px] bg-gray-800 border-gray-700 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                     value={selectedNotice.content}
                     onChange={(e) =>
                       setSelectedNotice({
@@ -1585,25 +1477,34 @@ export default function NoticesPage() {
                           isActive: Boolean(checked),
                         })
                       }
+                      className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
                     />
-                    <Label htmlFor="edit-active" className="text-sm font-medium leading-none">
+                    <Label htmlFor="edit-active" className="text-sm font-medium leading-none text-gray-300">
                       Active Notice
                     </Label>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-gray-400">
                     {selectedNotice.isActive
                       ? "This notice is currently visible to users"
-                      : "This notice is archived and not visible"}
+                      : "This notice is not visible to users"}
                   </p>
                 </div>
               </div>
             </ScrollArea>
           )}
-          <div className="flex justify-end gap-2 p-4 border-t bg-muted/30">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-800 bg-gray-900/80">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              className="border-gray-700 hover:bg-gray-800 text-gray-300"
+            >
               Cancel
             </Button>
-            <Button onClick={handleUpdateNotice} disabled={isSubmitting} className="gap-2">
+            <Button
+              onClick={handleUpdateNotice}
+              disabled={isSubmitting}
+              className="gap-2 bg-purple-600 hover:bg-purple-700"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1622,35 +1523,44 @@ export default function NoticesPage() {
 
       {/* Delete Notice Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] border-gray-800 bg-gray-900">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+            <DialogTitle className="flex items-center gap-2 text-rose-400">
               <Trash2 className="h-5 w-5" />
               Confirm Deletion
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-gray-400">
               This action cannot be undone. Are you sure you want to permanently delete this notice?
             </DialogDescription>
           </DialogHeader>
           {selectedNotice && (
             <div className="space-y-4 py-4">
-              <div className="flex items-start gap-4 p-4 border rounded-md bg-destructive/5">
-                <div className="bg-destructive/10 p-2 rounded-md">
-                  <Trash2 className="h-6 w-6 text-destructive" />
+              <div className="flex items-start gap-4 p-4 border border-rose-900/30 rounded-md bg-rose-900/10">
+                <div className="bg-rose-900/20 p-2 rounded-md">
+                  <Trash2 className="h-6 w-6 text-rose-400" />
                 </div>
                 <div>
-                  <h4 className="font-medium">{selectedNotice.title}</h4>
-                  <p className="text-sm text-muted-foreground">Published: {formatDate(selectedNotice.createdAt)}</p>
-                  <p className="text-sm text-muted-foreground">Expires: {formatDate(selectedNotice.expiryDate)}</p>
+                  <h4 className="font-medium text-gray-200">{selectedNotice.title}</h4>
+                  <p className="text-sm text-gray-400">Published: {formatDate(selectedNotice.createdAt)}</p>
+                  <p className="text-sm text-gray-400">Expires: {formatDate(selectedNotice.expiryDate)}</p>
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              className="border-gray-700 hover:bg-gray-800 text-gray-300"
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteNotice} disabled={isSubmitting} className="gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleDeleteNotice}
+              disabled={isSubmitting}
+              className="gap-2 bg-rose-600 hover:bg-rose-700"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1660,135 +1570,6 @@ export default function NoticesPage() {
                 <>
                   <Trash2 className="h-4 w-4" />
                   Delete Notice
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Send Notification Dialog */}
-      <Dialog open={isNotifyDialogOpen} onOpenChange={setIsNotifyDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              Send Notification
-            </DialogTitle>
-            <DialogDescription>Send additional notifications for this notice to selected channels</DialogDescription>
-          </DialogHeader>
-          {selectedNotice && (
-            <div className="space-y-6 py-4">
-              <div className="p-3 border rounded-md bg-muted/30">
-                <h3 className="font-medium text-sm">Notice: {selectedNotice.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1">Target: {selectedNotice.targetAudience.join(", ")}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Notification Channels</Label>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                    <Checkbox
-                      id="notify-email"
-                      checked={notificationOptions.email}
-                      onCheckedChange={(checked) =>
-                        setNotificationOptions({
-                          ...notificationOptions,
-                          email: Boolean(checked),
-                        })
-                      }
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="notify-email" className="font-medium flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-primary" />
-                        Email Notification
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Send email to all recipients</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                    <Checkbox
-                      id="notify-sms"
-                      checked={notificationOptions.sms}
-                      onCheckedChange={(checked) =>
-                        setNotificationOptions({
-                          ...notificationOptions,
-                          sms: Boolean(checked),
-                        })
-                      }
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="notify-sms" className="font-medium flex items-center gap-2">
-                        <Smartphone className="h-4 w-4 text-primary" />
-                        SMS Notification
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Send SMS to registered phone numbers</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                    <Checkbox
-                      id="notify-push"
-                      checked={notificationOptions.push}
-                      onCheckedChange={(checked) =>
-                        setNotificationOptions({
-                          ...notificationOptions,
-                          push: Boolean(checked),
-                        })
-                      }
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="notify-push" className="font-medium flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-primary" />
-                        Push Notification
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Send push notification to mobile app users</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="custom-message" className="text-sm font-medium">
-                  Custom Message (optional)
-                </Label>
-                <Textarea
-                  id="custom-message"
-                  placeholder="Add a custom message to include with the notification"
-                  className="min-h-[100px] border-border/60 focus-visible:ring-primary/20"
-                  value={notificationOptions.customMessage}
-                  onChange={(e) =>
-                    setNotificationOptions({
-                      ...notificationOptions,
-                      customMessage: e.target.value,
-                    })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  Leave blank to use the notice title as the notification message
-                </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNotifyDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={sendNotifications}
-              disabled={
-                (!notificationOptions.email && !notificationOptions.sms && !notificationOptions.push) || isSubmitting
-              }
-              className="gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Bell className="h-4 w-4" />
-                  Send Notifications
                 </>
               )}
             </Button>
