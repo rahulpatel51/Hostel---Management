@@ -4,7 +4,34 @@ import type React from "react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { BedDouble, Bell, ClipboardList, Info, MessageSquare, Users, ArrowUpRight, ArrowDownRight, Calendar, FileText, Clock, CheckCircle, XCircle, Loader2, UserCheck, AlertCircle, FileSearch, ThumbsUp, ThumbsDown, AlertTriangle, Check, X, Plus, LayoutDashboard, Shield } from 'lucide-react'
+import {
+  BedDouble,
+  Bell,
+  ClipboardList,
+  Info,
+  MessageSquare,
+  Users,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  UserCheck,
+  AlertCircle,
+  FileSearch,
+  AlertTriangle,
+  Check,
+  X,
+  Plus,
+  Home,
+  Stethoscope,
+  CalendarDays,
+  PanelLeft,
+  Tag,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface Student {
+  userId: any
   _id: string
   studentId: string
   name: string
@@ -29,14 +57,24 @@ interface Student {
 }
 
 interface LeaveApplication {
+  priority: string
   _id: string
   student: Student
   startDate: string
   endDate: string
   reason: string
   status: "pending" | "approved" | "rejected"
+  leaveType: string
+  destination: string
+  contactDuringLeave: string
+  parentApproval: boolean
+  documents: string[]
+  remarks?: string
+  approvedBy?: {
+    name: string
+  }
+  approvalDate?: string
   createdAt: string
-  priority?: "low" | "medium" | "high"
 }
 
 interface Complaint {
@@ -52,9 +90,19 @@ interface Complaint {
 interface Notice {
   _id: string
   title: string
-  description: string
-  priority: "low" | "medium" | "high"
+  content: string
+  category: "general" | "academic" | "hostel" | "event" | "emergency" | "other"
+  importance: "normal" | "important" | "urgent"
+  publishedBy: {
+    _id: string
+    fullName: string
+  }
+  targetAudience: ("all" | "students" | "wardens" | "admin")[]
+  attachments: string[]
+  expiryDate: string
+  isActive: boolean
   createdAt: string
+  updatedAt: string
 }
 
 interface PendingApproval {
@@ -138,6 +186,7 @@ export default function AdminDashboard() {
     fetchDashboardData()
   }, [])
 
+  // Update the fetchDashboardData function to properly filter pending items
   const fetchDashboardData = async () => {
     try {
       setLoading({
@@ -150,8 +199,12 @@ export default function AdminDashboard() {
 
       const [studentsRes, leavesRes, complaintsRes, noticesRes, approvalsRes] = await Promise.all([
         api.get("/admin/students").catch(() => ({ data: { data: [] } })),
-        api.get("/admin/leave?status=pending&limit=5").catch(() => ({ data: { data: [] } })),
-        api.get("/admin/complaints?status=pending,in-progress&limit=5").catch(() => ({ data: { data: [] } })),
+        api
+          .get("/admin/leave")
+          .catch(() => ({ data: { data: [] } })), // Fetch all leaves
+        api
+          .get("/admin/complaints")
+          .catch(() => ({ data: { data: [] } })), // Fetch all complaints
         api.get("/notices?limit=5").catch(() => ({ data: { data: [] } })),
         api.get("/admin/approvals/pending").catch(() => ({ data: { data: [] } })),
       ])
@@ -164,8 +217,10 @@ export default function AdminDashboard() {
 
       const activeStudents = studentsRes.data.data.filter((s: { status: string }) => s.status === "Active").length
       const occupiedRooms = studentsRes.data.data.filter((s: { room: any }) => s.room).length
-      const pendingLeaves = leavesRes.data.data.length
-      const activeComplaints = complaintsRes.data.data.length
+      const pendingLeaves = leavesRes.data.data.filter((l: { status: string }) => l.status === "pending").length
+      const activeComplaints = complaintsRes.data.data.filter(
+        (c: { status: string }) => c.status === "pending" || c.status === "in-progress",
+      ).length
       const highPriorityNotices = noticesRes.data.data.filter((n: { priority: string }) => n.priority === "high").length
 
       setStats({
@@ -194,9 +249,12 @@ export default function AdminDashboard() {
     }
   }
 
+  // Update the handleApproveLeave function to match the API endpoint in the leave approvals page
   const handleApproveLeave = async (leaveId: string) => {
     try {
-      await api.patch(`/admin/leaves/${leaveId}`, { status: "approved" })
+      await api.put(`/admin/leave/${leaveId}`, {
+        status: "approved",
+      })
       toast({
         title: "Success",
         description: "Leave approved",
@@ -212,9 +270,12 @@ export default function AdminDashboard() {
     }
   }
 
+  // Update the handleRejectLeave function to match the API endpoint in the leave approvals page
   const handleRejectLeave = async (leaveId: string) => {
     try {
-      await api.patch(`/admin/leaves/${leaveId}`, { status: "rejected" })
+      await api.put(`/admin/leave/${leaveId}`, {
+        status: "rejected",
+      })
       toast({
         title: "Success",
         description: "Leave rejected",
@@ -230,9 +291,12 @@ export default function AdminDashboard() {
     }
   }
 
+  // Update the handleResolveComplaint function to match the API endpoint in the complaints management page
   const handleResolveComplaint = async (complaintId: string) => {
     try {
-      await api.patch(`/admin/complaints/${complaintId}`, { status: "resolved" })
+      await api.put(`/admin/complaints/${complaintId}`, {
+        status: "resolved",
+      })
       toast({
         title: "Success",
         description: "Complaint resolved",
@@ -384,7 +448,7 @@ export default function AdminDashboard() {
     }
 
     // Default to low priority if not provided
-    const priorityKey = (priority?.toLowerCase() || 'low') as keyof typeof variants
+    const priorityKey = (priority?.toLowerCase() || "low") as keyof typeof variants
     const variant = variants[priorityKey] || variants.low
 
     return (
@@ -423,6 +487,68 @@ export default function AdminDashboard() {
             <FileText className="h-4 w-4 text-gray-600 dark:text-gray-400" />
           </div>
         )
+    }
+  }
+
+  const calculateDuration = (startDate: string, endDate: string) => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return `${diffDays} day${diffDays !== 1 ? "s" : ""}`
+  }
+
+  const getLeaveTypeIcon = (type: string) => {
+    switch (type) {
+      case "home":
+        return <Home className="h-4 w-4 text-blue-500" />
+      case "medical":
+        return <Stethoscope className="h-4 w-4 text-red-500" />
+      default:
+        return <CalendarDays className="h-4 w-4 text-purple-500" />
+    }
+  }
+
+  const getCategoryBadgeVariant = (category: string) => {
+    switch (category) {
+      case "event":
+        return "secondary"
+      case "emergency":
+        return "destructive"
+      case "academic":
+        return "default"
+      case "hostel":
+        return "outline"
+      default:
+        return "outline"
+    }
+  }
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "event":
+        return <Calendar className="h-4 w-4" />
+      case "emergency":
+        return <AlertCircle className="h-4 w-4" />
+      case "academic":
+        return <ClipboardList className="h-4 w-4" />
+      case "hostel":
+        return <PanelLeft className="h-4 w-4" />
+      case "general":
+        return <Info className="h-4 w-4" />
+      default:
+        return <Tag className="h-4 w-4" />
+    }
+  }
+
+  const getImportanceColor = (importance: string) => {
+    switch (importance) {
+      case "urgent":
+        return "text-red-500"
+      case "important":
+        return "text-amber-500"
+      default:
+        return "text-green-500"
     }
   }
 
@@ -573,14 +699,16 @@ export default function AdminDashboard() {
                       originalType: item.type,
                       priority: item.priority || "medium",
                     })),
-                    ...leaves.map((item) => ({
-                      ...item,
-                      type: "Leave",
-                      date: item.createdAt,
-                      priority: item.priority || "medium",
-                    })),
+                    ...leaves
+                      .filter((leave) => leave.status === "pending")
+                      .map((item) => ({
+                        ...item,
+                        type: "Leave",
+                        date: item.createdAt,
+                        priority: item.priority || "medium",
+                      })),
                     ...complaints
-                      .filter((c) => c.status !== "resolved")
+                      .filter((c) => c.status === "pending" || c.status === "in-progress")
                       .map((item) => ({
                         ...item,
                         type: "Complaint",
@@ -688,8 +816,8 @@ export default function AdminDashboard() {
                     ))}
 
                   {pendingApprovals.length === 0 &&
-                    leaves.length === 0 &&
-                    complaints.filter((c) => c.status !== "resolved").length === 0 && (
+                    leaves.filter((leave) => leave.status === "pending").length === 0 &&
+                    complaints.filter((c) => c.status === "pending" || c.status === "in-progress").length === 0 && (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-full mb-3">
                           <FileSearch className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
@@ -721,55 +849,77 @@ export default function AdminDashboard() {
                     <Skeleton key={i} className="h-20 w-full rounded-lg" />
                   ))}
                 </div>
-              ) : leaves.length > 0 ? (
-                leaves.map((leave) => (
-                  <div
-                    key={leave._id}
-                    className="p-4 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors"
-                  >
-                    <div className="flex gap-3 items-start">
-                      <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800">
-                        <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-gray-900 dark:text-white">{leave.student.name}</h3>
-                          <span className="text-xs text-muted-foreground">{formatDate(leave.createdAt)}</span>
+              ) : leaves.filter((leave) => leave.status === "pending").length > 0 ? (
+                leaves
+                  .filter((leave) => leave.status === "pending")
+                  .map((leave) => (
+                    <div
+                      key={leave._id}
+                      className="p-4 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors"
+                    >
+                      <div className="flex gap-3 items-start">
+                        <Avatar className="h-9 w-9 border border-gray-200 dark:border-gray-700">
+                          <AvatarImage
+                            src={
+                              leave.student.userId?.profilePicture ||
+                              `https://ui-avatars.com/api/?name=${leave.student.name}&background=random`
+                            }
+                            alt={leave.student.name}
+                          />
+                          <AvatarFallback>{leave.student.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                              {leave.student.name}
+                              {leave.student.room && (
+                                <Badge variant="outline" className="text-xs">
+                                  {leave.student.room.block}-{leave.student.room.roomNumber}
+                                </Badge>
+                              )}
+                            </h3>
+                            <span className="text-xs text-muted-foreground">{formatDate(leave.createdAt)}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {formatDateRange(leave.startDate, leave.endDate)} (
+                            {calculateDuration(leave.startDate, leave.endDate)})
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge
+                              variant="outline"
+                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800 shadow-sm"
+                            >
+                              {leave.reason}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800 shadow-sm"
+                            >
+                              To: {leave.destination}
+                            </Badge>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {formatDateRange(leave.startDate, leave.endDate)}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {leave.priority && getPriorityBadge(leave.priority)}
-                          <Badge
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm"
                             variant="outline"
-                            className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800 shadow-sm"
+                            onClick={() => handleApproveLeave(leave._id)}
                           >
-                            {leave.reason}
-                          </Badge>
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800 shadow-sm"
+                            variant="outline"
+                            onClick={() => handleRejectLeave(leave._id)}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm"
-                          variant="outline"
-                          onClick={() => handleApproveLeave(leave._id)}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800 shadow-sm"
-                          variant="outline"
-                          onClick={() => handleRejectLeave(leave._id)}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-3">
@@ -779,6 +929,57 @@ export default function AdminDashboard() {
                   <p className="text-xs text-muted-foreground mt-1">All leave requests are processed</p>
                 </div>
               )}
+
+              {/* Approved Leaves Section */}
+              {leaves.filter((leave) => leave.status === "approved").length > 0 && (
+                <>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b">
+                    <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Recently Approved Leaves
+                    </h3>
+                  </div>
+                  {leaves
+                    .filter((leave) => leave.status === "approved")
+                    .slice(0, 3)
+                    .map((leave) => (
+                      <div
+                        key={leave._id}
+                        className="p-4 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors"
+                      >
+                        <div className="flex gap-3 items-start">
+                          <Avatar className="h-9 w-9 border border-gray-200 dark:border-gray-700">
+                            <AvatarImage
+                              src={`https://avatar.vercel.sh/${leave.student.name}.png`}
+                              alt={leave.student.name}
+                            />
+                            <AvatarFallback>{leave.student.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                {leave.student.name}
+                                {leave.student.room && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {leave.student.room.block}-{leave.student.room.roomNumber}
+                                  </Badge>
+                                )}
+                              </h3>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                Approved
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {formatDateRange(leave.startDate, leave.endDate)} (
+                              {calculateDuration(leave.startDate, leave.endDate)})
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </>
+              )}
             </div>
             <div className="p-4 border-t text-center">
               <Button
@@ -786,7 +987,7 @@ export default function AdminDashboard() {
                 className="border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-700 dark:hover:bg-purple-900/20 shadow-sm"
                 asChild
               >
-                <Link href="/dashboard/admin/leaves">View all leave requests</Link>
+                <Link href="/dashboard/admin/leave">View all leave requests</Link>
               </Button>
             </div>
           </TabsContent>
@@ -800,42 +1001,51 @@ export default function AdminDashboard() {
                     <Skeleton key={i} className="h-20 w-full rounded-lg" />
                   ))}
                 </div>
-              ) : complaints.length > 0 ? (
-                complaints.map((complaint) => (
-                  <div
-                    key={complaint._id}
-                    className="p-4 hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-colors"
-                  >
-                    <div className="flex gap-3 items-start">
-                      <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800">
-                        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-gray-900 dark:text-white">{complaint.type}</h3>
-                          <span className="text-xs text-muted-foreground">{formatDate(complaint.createdAt)}</span>
+              ) : complaints.filter((complaint) => complaint.status === "pending" || complaint.status === "in-progress")
+                  .length > 0 ? (
+                complaints
+                  .filter((complaint) => complaint.status === "pending" || complaint.status === "in-progress")
+                  .map((complaint) => (
+                    <div
+                      key={complaint._id}
+                      className="p-4 hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-colors"
+                    >
+                      <div className="flex gap-3 items-start">
+                        <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800">
+                          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{complaint.description}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {getPriorityBadge(complaint.priority)}
-                          {getStatusBadge(complaint.status)}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {complaint.type || "Complaint"}
+                            </h3>
+                            <span className="text-xs text-muted-foreground">{formatDate(complaint.createdAt)}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{complaint.description}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {getPriorityBadge(complaint.priority)}
+                            {getStatusBadge(complaint.status)}
+                            <Badge variant="outline" className="text-xs">
+                              {complaint.student?.name || "Student"}
+                            </Badge>
+                            {complaint.student?.room && (
+                              <Badge variant="outline" className="text-xs">
+                                {complaint.student.room.block}-{complaint.student.room.roomNumber}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                          onClick={() => handleResolveComplaint(complaint._id)}
+                        >
+                          Resolve
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant={complaint.status === "resolved" ? "outline" : "default"}
-                        className={
-                          complaint.status === "resolved"
-                            ? "border-orange-300 text-orange-600 hover:bg-orange-50 shadow-sm"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-                        }
-                        onClick={() => complaint.status !== "resolved" && handleResolveComplaint(complaint._id)}
-                      >
-                        {complaint.status === "resolved" ? "View" : "Resolve"}
-                      </Button>
                     </div>
-                  </div>
-                ))
+                  ))
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-full mb-3">
@@ -844,6 +1054,52 @@ export default function AdminDashboard() {
                   <p className="text-muted-foreground">No active complaints</p>
                   <p className="text-xs text-muted-foreground mt-1">All complaints are resolved</p>
                 </div>
+              )}
+
+              {/* Resolved Complaints Section */}
+              {complaints.filter((complaint) => complaint.status === "resolved").length > 0 && (
+                <>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b">
+                    <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Recently Resolved Complaints
+                    </h3>
+                  </div>
+                  {complaints
+                    .filter((complaint) => complaint.status === "resolved")
+                    .slice(0, 3)
+                    .map((complaint) => (
+                      <div
+                        key={complaint._id}
+                        className="p-4 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors"
+                      >
+                        <div className="flex gap-3 items-start">
+                          <Avatar className="h-9 w-9 border border-gray-200 dark:border-gray-700">
+                            <AvatarImage
+                              src={
+                                complaint.student?.userId?.profilePicture ||
+                                `https://ui-avatars.com/api/?name=${complaint.student?.name || "User"}&background=random`
+                              }
+                              alt={complaint.student?.name || "Student"}
+                            />
+                            <AvatarFallback>{(complaint.student?.name || "S").charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-medium text-gray-900 dark:text-white">
+                                {complaint.type || "Complaint"}
+                              </h3>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                Resolved
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{complaint.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </>
               )}
             </div>
             <div className="p-4 border-t text-center">
@@ -891,61 +1147,68 @@ export default function AdminDashboard() {
                 ))}
               </div>
             ) : notices.length > 0 ? (
-              notices.map((notice) => (
-                <div
-                  key={notice._id}
-                  className="p-4 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors"
-                >
-                  <div className="flex gap-3 items-start">
-                    <div
-                      className={`p-2 rounded-full ${
-                        notice.priority === "high"
-                          ? "bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-                          : notice.priority === "medium"
-                            ? "bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
-                            : "bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                      }`}
-                    >
-                      <Bell
-                        className={`h-4 w-4 ${
-                          notice.priority === "high"
-                            ? "text-red-600 dark:text-red-400"
-                            : notice.priority === "medium"
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-blue-600 dark:text-blue-400"
+              notices
+                .filter((notice) => notice.isActive)
+                .slice(0, 5)
+                .map((notice) => (
+                  <div key={notice._id} className="p-4 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                    <div className="flex gap-3 items-start">
+                      <div
+                        className={`p-2 rounded-full ${
+                          notice.importance === "urgent"
+                            ? "bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+                            : notice.importance === "important"
+                              ? "bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+                              : "bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
                         }`}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-gray-900 dark:text-white">{notice.title}</h3>
-                        <span className="text-xs text-muted-foreground">{formatDate(notice.createdAt)}</span>
+                      >
+                        {getCategoryIcon(notice.category)}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{notice.description}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {getPriorityBadge(notice.priority)}
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            <span
+                              className={`inline-block h-2 w-2 rounded-full mr-2 ${getImportanceColor(notice.importance)}`}
+                            ></span>
+                            {notice.title}
+                          </h3>
+                          <span className="text-xs text-muted-foreground">{formatDate(notice.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{notice.content}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge
+                            variant={getCategoryBadgeVariant(notice.category)}
+                            className="flex items-center gap-1.5 capitalize"
+                          >
+                            {getCategoryIcon(notice.category)}
+                            {notice.category}
+                          </Badge>
+                          <Badge variant="outline" className="capitalize flex items-center gap-1.5">
+                            <Users className="h-3 w-3" />
+                            {notice.targetAudience.join(", ")}
+                          </Badge>
+                        </div>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`
+                          ${
+                            notice.importance === "urgent"
+                              ? "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
+                              : notice.importance === "important"
+                                ? "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                                : "border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
+                          }
+                          shadow-sm
+                        `}
+                        asChild
+                      >
+                        <Link href={`/dashboard/admin/notices/${notice._id}`}>Details</Link>
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`
-                        ${
-                          notice.priority === "high"
-                            ? "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
-                            : notice.priority === "medium"
-                              ? "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/20"
-                              : "border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
-                        }
-                        shadow-sm
-                      `}
-                      asChild
-                    >
-                      <Link href={`/dashboard/admin/notices/${notice._id}`}>Details</Link>
-                    </Button>
                   </div>
-                </div>
-              ))
+                ))
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-3">
