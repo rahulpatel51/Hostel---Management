@@ -1053,7 +1053,7 @@ export default function AdminDashboard() {
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <h3 className="font-medium text-gray-900 dark:text-white">
-                              Room {room.block}-{room.roomNumber}
+                              Room Number {room.roomNumber}
                             </h3>
                             {getStatusBadge(room.status)}
                           </div>

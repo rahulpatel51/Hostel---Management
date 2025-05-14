@@ -71,7 +71,7 @@ export default function RoomAllocationPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterGender, setFilterGender] = useState<"All" | "Male" | "Female">("All")
+  const [filterStatus, setFilterStatus] = useState<"All" | "Allocated" | "Unallocated">("All")
   const [loading, setLoading] = useState({
     students: false,
     rooms: false,
@@ -135,8 +135,11 @@ export default function RoomAllocationPage() {
     const regNum = student.registrationNumber || ""
     const matchesSearch =
       name.toLowerCase().includes(searchTerm.toLowerCase()) || regNum.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesGender = filterGender === "All" || student.gender === filterGender
-    return matchesSearch && matchesGender
+    const matchesStatus = 
+      filterStatus === "All" || 
+      (filterStatus === "Allocated" && student.roomId) || 
+      (filterStatus === "Unallocated" && !student.roomId)
+    return matchesSearch && matchesStatus
   })
 
   // Filter available rooms for selected student
@@ -377,16 +380,16 @@ export default function RoomAllocationPage() {
                         )}
                       </div>
                       <Select
-                        value={filterGender}
-                        onValueChange={(value) => setFilterGender(value as "All" | "Male" | "Female")}
+                        value={filterStatus}
+                        onValueChange={(value) => setFilterStatus(value as "All" | "Allocated" | "Unallocated")}
                       >
-                        <SelectTrigger className="w-[120px] border-purple-200 dark:border-purple-800/30">
-                          <SelectValue placeholder="Gender" />
+                        <SelectTrigger className="w-[150px] border-purple-200 dark:border-purple-800/30">
+                          <SelectValue placeholder="Filter by" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="All">All</SelectItem>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Allocated">Allocated</SelectItem>
+                          <SelectItem value="Unallocated">Unallocated</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -577,7 +580,7 @@ export default function RoomAllocationPage() {
                                       {selectedRoom.block}-{selectedRoom.roomNumber}
                                     </p>
                                     <p className="text-sm text-emerald-700/70 dark:text-emerald-300/70">
-                                      {selectedRoom.floor} | {selectedRoom.type}
+                                      {selectedRoom.floor} | {selectedRoom.roomType}
                                     </p>
                                   </div>
                                   <Badge
@@ -678,7 +681,6 @@ export default function RoomAllocationPage() {
                         <TableRow className="hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30">
                           <TableHead>Room</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Gender</TableHead>
                           <TableHead>Capacity</TableHead>
                           <TableHead>Occupied</TableHead>
                           <TableHead>Status</TableHead>
@@ -692,18 +694,10 @@ export default function RoomAllocationPage() {
                             className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10 border-emerald-200 dark:border-emerald-800/30"
                           >
                             <TableCell className="font-medium text-emerald-900 dark:text-emerald-100">
-                              {room.block}-{room.roomNumber}
+                              {room.roomNumber}
                               <div className="text-xs text-emerald-700/70 dark:text-emerald-300/70">{room.floor}</div>
                             </TableCell>
-                            <TableCell>{room.type}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="border-emerald-200 bg-emerald-100/50 text-emerald-800 dark:border-emerald-800/30 dark:bg-emerald-900/20 dark:text-emerald-300"
-                              >
-                                {room.gender}
-                              </Badge>
-                            </TableCell>
+                            <TableCell>{room.roomType}</TableCell>
                             <TableCell>{room.capacity}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
@@ -848,7 +842,7 @@ export default function RoomAllocationPage() {
         <SheetContent className="w-full sm:max-w-md border-l border-emerald-200 dark:border-emerald-800/30">
           <SheetHeader className="border-b border-emerald-100 dark:border-emerald-800/20 pb-4">
             <SheetTitle className="text-emerald-900 dark:text-emerald-100">
-              Room {currentRoomDetails?.block}-{currentRoomDetails?.roomNumber} Occupants
+              Room {currentRoomDetails?.roomNumber} Occupants
             </SheetTitle>
           </SheetHeader>
           <div className="mt-6">
