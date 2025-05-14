@@ -819,7 +819,7 @@ export default function AdminDashboard() {
           }
           change={`${Math.round(roomStats.occupancyRate)}% occupied`}
           icon={<BedDouble className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-          link="/dashboard/admin/rooms"
+          link="/dashboard/admin/roomAllocation"
           linkText="View Rooms"
           borderColor="border-emerald-200 dark:border-emerald-800/30"
           bgColor="bg-emerald-50 dark:bg-emerald-900/20"

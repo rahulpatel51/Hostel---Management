@@ -49,6 +49,7 @@ interface Student {
 }
 
 interface Room {
+  roomType: any
   _id: string
   block: string
   roomNumber: string
@@ -552,7 +553,7 @@ export default function RoomAllocationPage() {
                                 {availableRooms.length > 0 ? (
                                   availableRooms.map((room) => (
                                     <SelectItem key={room._id} value={room._id}>
-                                      {`${room.block}-${room.roomNumber} (${room.type}) - ${room.capacity - room.occupiedCount} bed${
+                                      {`RoomNumber-${room.roomNumber} (${room.roomType}) - ${room.capacity - room.occupiedCount} bed${
                                         room.capacity - room.occupiedCount !== 1 ? "s" : ""
                                       } available`}
                                     </SelectItem>
