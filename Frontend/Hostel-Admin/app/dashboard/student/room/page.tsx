@@ -1,94 +1,223 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useToast } from "@/components/ui/use-toast";
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import { 
+  BedDouble, Mail, Phone, MapPin, Home, Users, 
+  Wifi, ClipboardList, Ruler, User, Layers, 
+  BatteryFull, Droplets, Sofa, Loader2, AlertCircle,
+  RefreshCw, LogIn
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BedDouble, Mail, Phone, MapPin, Home, Users, Calendar, Wifi, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
+
+interface Student {
+  _id: string;
+  studentId: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  course: string;
+  year: string;
+  status: string;
+  address?: string;
+  faceId?: string;
+  image?: string;
+}
+
+interface Room {
+  _id: string;
+  block: string;
+  roomNumber: string;
+  floor: string;
+  capacity: number;
+  occupiedCount: number;
+  roomType: string;
+  facilities: string[];
+  description?: string;
+  price?: number;
+  pricePeriod?: string;
+  imageUrl?: string;
+  roomId: string;
+  status: string;
+  occupants: Student[];
+}
+
+interface ApiResponse {
+  message: string;
+  success: boolean;
+  data: {
+    student: Student & {
+      room?: Room;
+    };
+  };
+}
+
+// Static room rules that will be displayed
+const DEFAULT_ROOM_RULES = [
+  "No smoking or alcohol consumption in rooms",
+  "Lights out by 11:00 PM on weekdays",
+  "Visitors must leave by 9:00 PM",
+  "Keep noise levels reasonable after 10:00 PM",
+  "No cooking in rooms - use common kitchen area",
+  "Clean your own dishes after use",
+  "Report any damages immediately",
+  "No pets allowed",
+  "Conserve electricity and water",
+  "Respect other occupants' privacy and space"
+];
 
 export default function RoomDetailsPage() {
   const { toast } = useToast();
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [requestReason, setRequestReason] = useState("");
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [studentData, setStudentData] = useState<Student | null>(null);
+  const [roomData, setRoomData] = useState<Room | null>(null);
+  const [error, setError] = useState<{message: string; code?: string} | null>(null);
 
-  const roomDetails = {
-    roomNumber: "A-204",
-    block: "Boys Hostel A",
-    floor: "2nd Floor",
-    roomType: "AC Double Sharing",
-    amenities: ["Wi-Fi", "Attached Bathroom", "Laundry", "Cleaning Service", "24/7 Electricity", "Study Table"],
-    rules: [
-      "No visitors after 10 PM",
-      "Lights out by 11 PM on weekdays",
-      "Maintain cleanliness",
-      "No smoking or alcohol",
-      "Respect roommate's privacy"
-    ],
-    image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8aG9zdGVsJTIwcm9vbXxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=80"
-  };
+  const fetchRoomDetails = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
 
-  const roommates = [
-    {
-      id: 1,
-      name: "Rahul Sharma",
-      email: "rahul.sharma@example.com",
-      phone: "+91 9876543210",
-      course: "B.Tech Computer Science",
-      year: "3rd Year",
-      profileImage: "https://randomuser.me/api/portraits/men/1.jpg",
-      joinedDate: "15 Aug 2022"
-    },
-    {
-      id: 2,
-      name: "Amit Patel",
-      email: "amit.patel@example.com",
-      phone: "+91 8765432109",
-      course: "B.Tech Electrical",
-      year: "2nd Year",
-      profileImage: "https://randomuser.me/api/portraits/men/2.jpg",
-      joinedDate: "20 Jul 2023"
-    }
-  ];
+      const response = await axios.get<ApiResponse>('http://localhost:5000/api/student/room-info', {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+      if (response.data?.success) {
+        setStudentData(response.data.data.student);
+        setRoomData(response.data.data.student.room || null);
+      } else {
+        throw new Error(response.data?.message || 'Failed to fetch room details');
+      }
+    } catch (err) {
+      console.error('Error fetching room details:', err);
+      
+      let errorMessage = "Failed to load room details";
+      let errorCode = "UNKNOWN_ERROR";
+      
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+        errorCode = err.response?.data?.code || errorCode;
+        
+        if (err.response?.status === 401) {
+          router.push('/login');
+          return;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
 
-  const handleRoomChangeRequest = () => {
-    if (showRequestForm && requestReason.trim() === "") {
+      setError({ message: errorMessage, code: errorCode });
+      
       toast({
         title: "Error",
-        description: "Please provide a reason for room change",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        action: errorCode === 'STUDENT_NOT_FOUND' ? (
+          <Button variant="ghost" onClick={() => router.push('/login')}>
+            Login Again
+          </Button>
+        ) : undefined
       });
-      return;
-    }
-
-    if (showRequestForm) {
-      toast({
-        title: "Request Submitted",
-        description: "Your room change request has been sent to the warden",
-        className: "bg-green-500 text-white"
-      });
-      setShowRequestForm(false);
-      setRequestReason("");
-    } else {
-      setShowRequestForm(true);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRoomDetails();
+  }, []);
+
+  const renderInfoItem = (icon: React.ReactNode, label: string, value: string | React.ReactNode) => (
+    <div className="flex items-start gap-4">
+      <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+        {icon}
+      </div>
+      <div>
+        <h3 className="font-medium text-gray-500 dark:text-gray-400">{label}</h3>
+        <p className="text-lg font-semibold">{value}</p>
+      </div>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-600">Loading room details...</p>
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
+        <p className="text-gray-600">Loading room details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <AlertCircle className="h-12 w-12 text-red-500" />
+        <h2 className="text-xl font-semibold">Error Loading Room Details</h2>
+        <p className="text-muted-foreground max-w-md text-center">
+          {error.message} {error.code && `(Code: ${error.code})`}
+        </p>
+        <div className="flex gap-2 mt-4">
+          <Button onClick={fetchRoomDetails} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try Again
+          </Button>
+          {error.code === 'STUDENT_NOT_FOUND' && (
+            <Button onClick={() => router.push('/login')}>
+              <LogIn className="mr-2 h-4 w-4" />
+              Login Again
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!studentData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <AlertCircle className="h-12 w-12 text-yellow-500" />
+        <h2 className="text-xl font-semibold">Student Data Not Found</h2>
+        <p className="text-muted-foreground max-w-md text-center">
+          Unable to retrieve your student information. Please try again later.
+        </p>
+        <Button onClick={fetchRoomDetails} variant="outline">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (!roomData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <Home className="h-12 w-12 text-indigo-500" />
+        <h2 className="text-xl font-semibold">No Room Assigned</h2>
+        <p className="text-muted-foreground max-w-md text-center">
+          You currently don't have a room assigned. Please contact the hostel administration.
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => router.push('/support')}>
+            Contact Support
+          </Button>
+          <Button variant="outline" onClick={fetchRoomDetails}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Check Again
+          </Button>
         </div>
       </div>
     );
@@ -98,31 +227,50 @@ export default function RoomDetailsPage() {
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       {/* Header */}
       <div className="flex flex-col gap-2 mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          <span className="text-indigo-600">{roomDetails.roomNumber}</span> - Room Details
+        <h1 className="text-3xl font-bold tracking-tight">
+          <span className="text-indigo-600">{roomData.roomNumber}</span> - Room Details
         </h1>
-        <p className="text-muted-foreground max-w-3xl">
-          Complete information about your hostel accommodation at {roomDetails.block}
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <Home className="h-4 w-4" /> Block {roomData.block}
+          </Badge>
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <Layers className="h-4 w-4" /> {roomData.floor}
+          </Badge>
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <User className="h-4 w-4" /> {roomData.roomType}
+          </Badge>
+          <Badge variant={roomData.status === 'Available' ? 'default' : 'destructive'}>
+            {roomData.status}
+          </Badge>
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left Column - Room Image and Basic Info */}
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Room Image */}
-          <Card className="overflow-hidden border border-gray-200 dark:border-gray-800">
+          <Card className="overflow-hidden">
             <div className="aspect-video w-full overflow-hidden">
               <img
-                src={roomDetails.image}
-                alt="Room Image"
+                src={roomData.imageUrl || '/placeholder-room.jpg'}
+                alt={`Room ${roomData.roomNumber}`}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/placeholder-room.jpg';
+                }}
               />
             </div>
+            {roomData.description && (
+              <CardContent className="p-6">
+                <p className="text-muted-foreground">{roomData.description}</p>
+              </CardContent>
+            )}
           </Card>
 
           {/* Room Specifications */}
-          <Card className="border border-gray-200 dark:border-gray-800">
+          <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
                 <BedDouble className="h-5 w-5 text-indigo-600" />
@@ -131,53 +279,34 @@ export default function RoomDetailsPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-                    <Home className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500 dark:text-gray-400">Hostel Block</h3>
-                    <p className="text-lg font-semibold">{roomDetails.block}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-                    <MapPin className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500 dark:text-gray-400">Location</h3>
-                    <p className="text-lg font-semibold">{roomDetails.floor}</p>
-                  </div>
-                </div>
+                {renderInfoItem(
+                  <Home className="h-5 w-5 text-indigo-600" />,
+                  "Hostel Block",
+                  roomData.block
+                )}
+                {renderInfoItem(
+                  <MapPin className="h-5 w-5 text-indigo-600" />,
+                  "Location",
+                  roomData.floor
+                )}
               </div>
-
               <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-                    <Users className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500 dark:text-gray-400">Room Type</h3>
-                    <p className="text-lg font-semibold">{roomDetails.roomType}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-                    <Calendar className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500 dark:text-gray-400">Allocated Since</h3>
-                    <p className="text-lg font-semibold">15 Aug 2022</p>
-                  </div>
-                </div>
+                {renderInfoItem(
+                  <Users className="h-5 w-5 text-indigo-600" />,
+                  "Room Type",
+                  `${roomData.roomType} (${roomData.occupiedCount}/${roomData.capacity})`
+                )}
+                {roomData.price && renderInfoItem(
+                  <span className="h-5 w-5 text-indigo-600">₹</span>,
+                  "Price",
+                  `${roomData.price}/${roomData.pricePeriod || 'month'}`
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Amenities */}
-          <Card className="border border-gray-200 dark:border-gray-800">
+          <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
                 <Wifi className="h-5 w-5 text-indigo-600" />
@@ -185,76 +314,97 @@ export default function RoomDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {roomDetails.amenities.map((amenity, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="p-1.5 rounded-md bg-indigo-100 dark:bg-indigo-900/30">
-                      <div className="h-4 w-4 text-indigo-600" />
+              <div className="grid grid-cols-2 gap-3">
+                {roomData.facilities.length > 0 ? (
+                  roomData.facilities.map((facility, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="p-1.5 rounded-md bg-indigo-100 dark:bg-indigo-900/30">
+                        <div className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <span className="font-medium text-sm">{facility}</span>
                     </div>
-                    <span className="font-medium">{amenity}</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-muted-foreground col-span-2">No amenities listed</p>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column - Roommates and Rules */}
+        {/* Right Column */}
         <div className="space-y-6">
           {/* Roommates */}
-          <Card className="border border-gray-200 dark:border-gray-800">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-indigo-600" />
-                Your Roommates
+                Roommates ({roomData.occupants.length})
               </CardTitle>
               <CardDescription>
-                {roommates.length} students sharing this room
+                {roomData.occupants.length === 0 
+                  ? "You currently have no roommates" 
+                  : `Sharing with ${roomData.occupants.length} student${roomData.occupants.length > 1 ? 's' : ''}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {roommates.map((roommate) => (
-                <div key={roommate.id} className="space-y-3">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 border-2 border-indigo-100 dark:border-indigo-900">
-                      <AvatarImage src={roommate.profileImage} />
-                      <AvatarFallback>{roommate.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-semibold">{roommate.name}</h3>
-                      <p className="text-sm text-muted-foreground">{roommate.course} - {roommate.year}</p>
+              {roomData.occupants.length > 0 ? (
+                roomData.occupants.map((roommate) => (
+                  <div key={roommate._id} className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12 border-2 border-indigo-100 dark:border-indigo-900">
+                        <AvatarImage 
+                          src={roommate.image} 
+                          alt={roommate.name} 
+                        />
+                        <AvatarFallback>
+                          {roommate.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold">{roommate.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {roommate.studentId} • {roommate.course} - {roommate.year}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 pl-16">
+                      <div className="flex items-center gap-3 text-sm">
+                        <Mail className="h-4 w-4 text-indigo-600" />
+                        <span>{roommate.email}</span>
+                      </div>
+                      {roommate.phone && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Phone className="h-4 w-4 text-indigo-600" />
+                          <span>{roommate.phone}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="space-y-2 pl-16">
-                    <div className="flex items-center gap-3 text-sm">
-                      <Mail className="h-4 w-4 text-indigo-600" />
-                      <span>{roommate.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <Phone className="h-4 w-4 text-indigo-600" />
-                      <span>{roommate.phone}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Joined: {roommate.joinedDate}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-4">
+                  No other occupants in this room
+                </p>
+              )}
             </CardContent>
           </Card>
 
           {/* Room Rules */}
-          <Card className="border border-gray-200 dark:border-gray-800">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <ClipboardList className="h-5 w-5 text-indigo-600" />
-                Room Rules
+                Hostel Rules
               </CardTitle>
+              <CardDescription>
+                All residents must follow these rules
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-3">
-                {roomDetails.rules.map((rule, index) => (
+                {DEFAULT_ROOM_RULES.map((rule, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
                       <div className="h-2 w-2 rounded-full bg-indigo-600" />
@@ -263,50 +413,6 @@ export default function RoomDetailsPage() {
                   </li>
                 ))}
               </ul>
-            </CardContent>
-          </Card>
-
-          {/* Room Change Request */}
-          <Card className="border border-gray-200 dark:border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-lg">Room Change Request</CardTitle>
-              <CardDescription>
-                Submit a formal request to change your room
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {showRequestForm && (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Reason for change
-                  </label>
-                  <textarea
-                    value={requestReason}
-                    onChange={(e) => setRequestReason(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    rows={3}
-                    placeholder="Explain why you need to change rooms..."
-                  />
-                </div>
-              )}
-              <Button 
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
-                onClick={handleRoomChangeRequest}
-              >
-                {showRequestForm ? "Submit Request" : "Request Room Change"}
-              </Button>
-              {showRequestForm && (
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-2"
-                  onClick={() => {
-                    setShowRequestForm(false);
-                    setRequestReason("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
             </CardContent>
           </Card>
         </div>

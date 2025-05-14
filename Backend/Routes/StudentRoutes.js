@@ -13,6 +13,7 @@ import {
   getFeeDetails,
   getAttendanceRecords,
   editLeaveApplication,
+  getStudentWithRoomInfo
 } from "../Controllers/StudentController.js"
 import { protect, authorize } from "../Middleware/auth.js"
 
@@ -45,5 +46,10 @@ router.get("/fees", getFeeDetails)
 
 // Attendance routes
 router.get("/attendance", getAttendanceRecords)
+
+
+router.get("/room-info", getStudentWithRoomInfo);
+
+
 
 export default router

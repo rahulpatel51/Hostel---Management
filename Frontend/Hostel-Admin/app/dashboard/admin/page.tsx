@@ -1,8 +1,12 @@
 "use client"
 
 import type React from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import axios from "axios"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   BedDouble,
@@ -31,19 +35,21 @@ import {
   CalendarDays,
   PanelLeft,
   Tag,
+  BarChart3,
+  Percent,
+  Building2,
+  DoorClosed,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { useEffect, useState } from "react"
-import axios from "axios"
 import { toast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
+// Types
 interface Student {
   userId: any
   _id: string
@@ -115,6 +121,44 @@ interface PendingApproval {
   priority?: "low" | "medium" | "high"
 }
 
+interface Room {
+  _id: string
+  block: string
+  roomNumber: string
+  floor: string
+  capacity: number
+  occupiedCount: number
+  type: string
+  gender: "Male" | "Female"
+  status: "Available" | "Full" | "Maintenance"
+}
+
+interface RoomOccupancyStats {
+  totalRooms: number
+  occupiedRooms: number
+  maintenanceRooms: number
+  availableRooms: number
+  occupancyRate: number
+  maleRooms: {
+    total: number
+    occupied: number
+    available: number
+  }
+  femaleRooms: {
+    total: number
+    occupied: number
+    available: number
+  }
+  blockStats: {
+    [key: string]: {
+      total: number
+      occupied: number
+      available: number
+      occupancyRate: number
+    }
+  }
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState({
@@ -123,6 +167,7 @@ export default function AdminDashboard() {
     complaints: true,
     notices: true,
     approvals: true,
+    rooms: true,
   })
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -137,6 +182,27 @@ export default function AdminDashboard() {
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([])
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [roomStats, setRoomStats] = useState<RoomOccupancyStats>({
+    totalRooms: 0,
+    occupiedRooms: 0,
+    maintenanceRooms: 0,
+    availableRooms: 0,
+    occupancyRate: 0,
+    maleRooms: {
+      total: 0,
+      occupied: 0,
+      available: 0,
+    },
+    femaleRooms: {
+      total: 0,
+      occupied: 0,
+      available: 0,
+    },
+    blockStats: {},
+  })
+
+  const [lastUpdatedTime, setLastUpdatedTime] = useState("")
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
 
@@ -186,7 +252,92 @@ export default function AdminDashboard() {
     fetchDashboardData()
   }, [])
 
-  // Update the fetchDashboardData function to properly filter pending items
+  useEffect(() => {
+    setLastUpdatedTime(
+      new Date().toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+    )
+  }, [])
+
+  // Calculate room statistics
+  const calculateRoomStats = (roomsData: Room[]) => {
+    const stats: RoomOccupancyStats = {
+      totalRooms: roomsData.length,
+      occupiedRooms: roomsData.filter((r) => r.status === "Full").length,
+      maintenanceRooms: roomsData.filter((r) => r.status === "Maintenance").length,
+      availableRooms: roomsData.filter((r) => r.status === "Available").length,
+      occupancyRate: 0,
+      maleRooms: {
+        total: 0,
+        occupied: 0,
+        available: 0,
+      },
+      femaleRooms: {
+        total: 0,
+        occupied: 0,
+        available: 0,
+      },
+      blockStats: {},
+    }
+
+    // Calculate total beds and occupied beds
+    let totalBeds = 0
+    let occupiedBeds = 0
+
+    roomsData.forEach((room) => {
+      totalBeds += room.capacity
+      occupiedBeds += room.occupiedCount
+
+      // Gender stats
+      if (room.gender === "Male") {
+        stats.maleRooms.total++
+        if (room.status === "Full") stats.maleRooms.occupied++
+        if (room.status === "Available") stats.maleRooms.available++
+      } else if (room.gender === "Female") {
+        stats.femaleRooms.total++
+        if (room.status === "Full") stats.femaleRooms.occupied++
+        if (room.status === "Available") stats.femaleRooms.available++
+      }
+
+      // Block stats
+      if (!stats.blockStats[room.block]) {
+        stats.blockStats[room.block] = {
+          total: 0,
+          occupied: 0,
+          available: 0,
+          occupancyRate: 0,
+        }
+      }
+
+      stats.blockStats[room.block].total++
+      if (room.status === "Full") stats.blockStats[room.block].occupied++
+      if (room.status === "Available") stats.blockStats[room.block].available++
+    })
+
+    // Calculate occupancy rates
+    stats.occupancyRate = totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0
+
+    Object.keys(stats.blockStats).forEach((block) => {
+      const blockRooms = roomsData.filter((r) => r.block === block)
+      let blockTotalBeds = 0
+      let blockOccupiedBeds = 0
+
+      blockRooms.forEach((room) => {
+        blockTotalBeds += room.capacity
+        blockOccupiedBeds += room.occupiedCount
+      })
+
+      stats.blockStats[block].occupancyRate = blockTotalBeds > 0 ? (blockOccupiedBeds / blockTotalBeds) * 100 : 0
+    })
+
+    return stats
+  }
+
+  // Fetch data from API
   const fetchDashboardData = async () => {
     try {
       setLoading({
@@ -195,9 +346,10 @@ export default function AdminDashboard() {
         complaints: true,
         notices: true,
         approvals: true,
+        rooms: true,
       })
 
-      const [studentsRes, leavesRes, complaintsRes, noticesRes, approvalsRes] = await Promise.all([
+      const [studentsRes, leavesRes, complaintsRes, noticesRes, approvalsRes, roomsRes] = await Promise.all([
         api.get("/admin/students").catch(() => ({ data: { data: [] } })),
         api
           .get("/admin/leave")
@@ -207,6 +359,9 @@ export default function AdminDashboard() {
           .catch(() => ({ data: { data: [] } })), // Fetch all complaints
         api.get("/notices?limit=5").catch(() => ({ data: { data: [] } })),
         api.get("/admin/approvals/pending").catch(() => ({ data: { data: [] } })),
+        api
+          .get("/rooms")
+          .catch(() => ({ data: { data: [] } })), // Fetch all rooms
       ])
 
       setStudents(studentsRes.data.data)
@@ -214,6 +369,11 @@ export default function AdminDashboard() {
       setComplaints(complaintsRes.data.data)
       setNotices(noticesRes.data.data)
       setPendingApprovals(approvalsRes.data.data)
+      setRooms(roomsRes.data.data)
+
+      // Calculate room statistics
+      const roomStats = calculateRoomStats(roomsRes.data.data)
+      setRoomStats(roomStats)
 
       const activeStudents = studentsRes.data.data.filter((s: { status: string }) => s.status === "Active").length
       const occupiedRooms = studentsRes.data.data.filter((s: { room: any }) => s.room).length
@@ -221,7 +381,9 @@ export default function AdminDashboard() {
       const activeComplaints = complaintsRes.data.data.filter(
         (c: { status: string }) => c.status === "pending" || c.status === "in-progress",
       ).length
-      const highPriorityNotices = noticesRes.data.data.filter((n: { priority: string }) => n.priority === "high").length
+      const highPriorityNotices = noticesRes.data.data.filter(
+        (n: { importance: string }) => n.importance === "urgent",
+      ).length
 
       setStats({
         totalStudents: studentsRes.data.data.length,
@@ -245,6 +407,7 @@ export default function AdminDashboard() {
         complaints: false,
         notices: false,
         approvals: false,
+        rooms: false,
       })
     }
   }
@@ -410,6 +573,24 @@ export default function AdminDashboard() {
         border: "border-blue-200 dark:border-blue-800",
         icon: <Info className="h-3 w-3 mr-1" />,
       },
+      available: {
+        bg: "bg-emerald-100 dark:bg-emerald-900/30",
+        text: "text-emerald-800 dark:text-emerald-200",
+        border: "border-emerald-200 dark:border-emerald-800",
+        icon: <CheckCircle className="h-3 w-3 mr-1" />,
+      },
+      full: {
+        bg: "bg-purple-100 dark:bg-purple-900/30",
+        text: "text-purple-800 dark:text-purple-200",
+        border: "border-purple-200 dark:border-purple-800",
+        icon: <Info className="h-3 w-3 mr-1" />,
+      },
+      maintenance: {
+        bg: "bg-amber-100 dark:bg-amber-900/30",
+        text: "text-amber-800 dark:text-amber-200",
+        border: "border-amber-200 dark:border-amber-800",
+        icon: <AlertTriangle className="h-3 w-3 mr-1" />,
+      },
     }
 
     const statusKey = status.toLowerCase().replace("-", "_") as keyof typeof variants
@@ -544,21 +725,21 @@ export default function AdminDashboard() {
   const getImportanceColor = (importance: string) => {
     switch (importance) {
       case "urgent":
-        return "text-red-500"
+        return "text-red-500 dark:text-red-400"
       case "important":
-        return "text-amber-500"
+        return "text-amber-500 dark:text-amber-400"
       default:
-        return "text-green-500"
+        return "text-green-500 dark:text-green-400"
     }
   }
 
   return (
     <div className="flex flex-col gap-6 pb-10">
       {/* Header Section */}
-      <div className="flex flex-col gap-2 bg-gradient-to-r from-indigo-50 to-white dark:from-indigo-900/20 dark:to-transparent p-6 -mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-2 border-b">
+      <div className="flex flex-col gap-2 bg-gradient-to-r from-purple-50 to-emerald-50 dark:from-purple-950/20 dark:to-emerald-950/20 p-6 -mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-2 border-b border-purple-100 dark:border-purple-800/30">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent dark:from-purple-400 dark:to-emerald-400">
               Hostel Management Dashboard
             </h1>
             <p className="text-muted-foreground max-w-2xl">
@@ -566,13 +747,37 @@ export default function AdminDashboard() {
               administrative tasks efficiently.
             </p>
           </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-purple-200 hover:bg-purple-50 text-purple-700 dark:border-purple-800/30 dark:hover:bg-purple-900/20 dark:text-purple-400"
+              asChild
+            >
+              <Link href="/dashboard/admin/rooms">
+                <BedDouble className="h-4 w-4 mr-2" />
+                Room Management
+              </Link>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800"
+              asChild
+            >
+              <Link href="/dashboard/admin/students">
+                <Users className="h-4 w-4 mr-2" />
+                Manage Students
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* System Alert */}
-      <Alert className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800 shadow-sm">
+      <Alert className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800/30 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-full border border-blue-200 dark:border-blue-800">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-full border border-blue-200 dark:border-blue-800/50">
             <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
@@ -593,43 +798,43 @@ export default function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total Students"
-          value={loading.students ? <Loader2 className="h-6 w-6 animate-spin text-indigo-500" /> : stats.totalStudents}
+          value={loading.students ? <Loader2 className="h-6 w-6 animate-spin text-purple-500" /> : stats.totalStudents}
           change={`${stats.activeStudents} active`}
-          icon={<Users className="h-5 w-5 text-indigo-600" />}
+          icon={<Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
           link="/dashboard/admin/students"
           linkText="Manage Students"
-          borderColor="border-indigo-100 dark:border-indigo-900/50"
-          bgColor="bg-indigo-50 dark:bg-indigo-900/20"
-          textColor="text-indigo-600 dark:text-indigo-400"
+          borderColor="border-purple-200 dark:border-purple-800/30"
+          bgColor="bg-purple-50 dark:bg-purple-900/20"
+          textColor="text-purple-600 dark:text-purple-400"
           percent={(stats.activeStudents / (stats.totalStudents || 1)) * 100}
         />
         <MetricCard
           title="Room Occupancy"
           value={
-            loading.students ? (
-              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+            loading.rooms ? (
+              <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
             ) : (
-              `${stats.occupiedRooms} / ${stats.totalStudents}`
+              `${roomStats.occupiedRooms} / ${roomStats.totalRooms}`
             )
           }
-          change={`${Math.round((stats.occupiedRooms / (stats.totalStudents || 1)) * 100)}% occupied`}
-          icon={<BedDouble className="h-5 w-5 text-blue-600" />}
+          change={`${Math.round(roomStats.occupancyRate)}% occupied`}
+          icon={<BedDouble className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
           link="/dashboard/admin/rooms"
           linkText="View Rooms"
-          borderColor="border-blue-100 dark:border-blue-900/50"
-          bgColor="bg-blue-50 dark:bg-blue-900/20"
-          textColor="text-blue-600 dark:text-blue-400"
-          percent={(stats.occupiedRooms / (stats.totalStudents || 1)) * 100}
+          borderColor="border-emerald-200 dark:border-emerald-800/30"
+          bgColor="bg-emerald-50 dark:bg-emerald-900/20"
+          textColor="text-emerald-600 dark:text-emerald-400"
+          percent={roomStats.occupancyRate}
         />
         <MetricCard
           title="Pending Leaves"
           value={loading.leaves ? <Loader2 className="h-6 w-6 animate-spin text-amber-500" /> : stats.pendingLeaves}
           change={`${stats.pendingLeaves > 0 ? "Needs attention" : "All clear"}`}
-          icon={<ClipboardList className="h-5 w-5 text-amber-600" />}
+          icon={<ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
           link="/dashboard/admin/leave"
           linkText="Review Leaves"
           warning={stats.pendingLeaves > 0}
-          borderColor="border-amber-100 dark:border-amber-900/50"
+          borderColor="border-amber-200 dark:border-amber-800/30"
           bgColor="bg-amber-50 dark:bg-amber-900/20"
           textColor="text-amber-600 dark:text-amber-400"
           percent={stats.pendingLeaves > 0 ? 75 : 0}
@@ -640,19 +845,277 @@ export default function AdminDashboard() {
             loading.complaints ? <Loader2 className="h-6 w-6 animate-spin text-orange-500" /> : stats.activeComplaints
           }
           change={`${stats.activeComplaints > 0 ? "Needs resolution" : "All clear"}`}
-          icon={<MessageSquare className="h-5 w-5 text-orange-600" />}
+          icon={<MessageSquare className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
           link="/dashboard/admin/complaints"
           linkText="Handle Complaints"
           warning={stats.activeComplaints > 0}
-          borderColor="border-orange-100 dark:border-orange-900/50"
+          borderColor="border-orange-200 dark:border-orange-800/30"
           bgColor="bg-orange-50 dark:bg-orange-900/20"
           textColor="text-orange-600 dark:text-orange-400"
           percent={stats.activeComplaints > 0 ? 75 : 0}
         />
       </div>
 
+      {/* Room Occupancy Stats */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+        {/* Room Occupancy Overview */}
+        <Card className="border-emerald-200 dark:border-emerald-800/30 shadow-md lg:col-span-2">
+          <CardHeader className="bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800/30">
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
+                  <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  Room Occupancy Overview
+                </CardTitle>
+                <CardDescription>Current status of all hostel rooms</CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 shadow-sm"
+                asChild
+              >
+                <Link href="/dashboard/admin/rooms">View All Rooms</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {loading.rooms ? (
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Overall Occupancy */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium text-emerald-900 dark:text-emerald-100">Overall Occupancy</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                        {Math.round(roomStats.occupancyRate)}%
+                      </span>
+                      <Percent className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  </div>
+                  <div className="relative pt-1">
+                    <div className="flex mb-2 items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/30">
+                          {roomStats.occupiedRooms} occupied rooms
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/30">
+                          {roomStats.totalRooms} total rooms
+                        </span>
+                      </div>
+                    </div>
+                    <div className="overflow-hidden h-2 mb-4 text-xs flex rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                      <div
+                        style={{ width: `${roomStats.occupancyRate}%` }}
+                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500 dark:bg-emerald-600"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Room Status Breakdown */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800/30">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Available</h4>
+                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        {roomStats.availableRooms} rooms
+                      </Badge>
+                    </div>
+                    <div className="mt-2">
+                      <Progress
+                        value={(roomStats.availableRooms / roomStats.totalRooms) * 100}
+                        className="h-2 bg-emerald-100 dark:bg-emerald-900/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800/30">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-purple-900 dark:text-purple-100">Occupied</h4>
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                        {roomStats.occupiedRooms} rooms
+                      </Badge>
+                    </div>
+                    <div className="mt-2">
+                      <Progress
+                        value={(roomStats.occupiedRooms / roomStats.totalRooms) * 100}
+                        className="h-2 bg-purple-100 dark:bg-purple-900/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800/30">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-amber-900 dark:text-amber-100">Maintenance</h4>
+                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        {roomStats.maintenanceRooms} rooms
+                      </Badge>
+                    </div>
+                    <div className="mt-2">
+                      <Progress
+                        value={(roomStats.maintenanceRooms / roomStats.totalRooms) * 100}
+                        className="h-2 bg-amber-100 dark:bg-amber-900/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Block-wise Occupancy */}
+                <div className="space-y-3">
+                  <h3 className="font-medium text-emerald-900 dark:text-emerald-100">Block-wise Occupancy</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(roomStats.blockStats).map(([block, stats]) => (
+                      <div
+                        key={block}
+                        className="flex items-center gap-3 p-3 border border-emerald-200 dark:border-emerald-800/30 rounded-lg"
+                      >
+                        <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                          <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-emerald-900 dark:text-emerald-100">Block {block}</h4>
+                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                              {Math.round(stats.occupancyRate)}%
+                            </span>
+                          </div>
+                          <div className="mt-1">
+                            <Progress
+                              value={stats.occupancyRate}
+                              className="h-1.5 bg-emerald-100 dark:bg-emerald-900/50"
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                            <span>{stats.occupied} occupied</span>
+                            <span>{stats.total} total</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="bg-emerald-50/50 dark:bg-emerald-950/10 border-t border-emerald-100 dark:border-emerald-800/20 py-3 px-6">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-sm text-emerald-700 dark:text-emerald-300">
+                Last updated: {lastUpdatedTime}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                onClick={fetchDashboardData}
+              >
+                <Loader2 className="h-3 w-3 mr-2" />
+                Refresh Data
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+
+        {/* Recent Room Activities */}
+        <Card className="border-purple-200 dark:border-purple-800/30 shadow-md">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 border-b border-purple-200 dark:border-purple-800/30">
+            <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
+              <DoorClosed className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              Recent Room Activity
+            </CardTitle>
+            <CardDescription>Latest room allocations and changes</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-purple-100 dark:divide-purple-800/20">
+              {loading.rooms ? (
+                <div className="space-y-3 p-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {rooms.slice(0, 4).map((room) => (
+                    <div
+                      key={room._id}
+                      className="p-4 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800/50">
+                          <BedDouble className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              Room {room.block}-{room.roomNumber}
+                            </h3>
+                            {getStatusBadge(room.status)}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {room.type} | {room.floor} | {room.gender}
+                          </div>
+                          <div className="mt-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="w-full bg-purple-100 dark:bg-purple-900/30 h-2 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-purple-500 dark:bg-purple-600"
+                                      style={{ width: `${(room.occupiedCount / room.capacity) * 100}%` }}
+                                    ></div>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">
+                                    {room.occupiedCount} of {room.capacity} beds occupied (
+                                    {Math.round((room.occupiedCount / room.capacity) * 100)}%)
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="flex justify-between mt-1 text-xs text-purple-700 dark:text-purple-300">
+                              <span>{room.occupiedCount} occupied</span>
+                              <span>{room.capacity} capacity</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {rooms.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-3">
+                        <BedDouble className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="text-muted-foreground">No rooms available</p>
+                      <p className="text-xs text-muted-foreground mt-1">Add rooms to get started</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="bg-purple-50/50 dark:bg-purple-950/10 border-t border-purple-100 dark:border-purple-800/20 py-3 px-6">
+            <Button
+              variant="outline"
+              className="w-full border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20 shadow-sm"
+              asChild
+            >
+              <Link href="/dashboard/admin/rooms">Manage All Rooms</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+
       {/* Tabs Section */}
-      <Card className="border-indigo-100 dark:border-indigo-900/50 shadow-md overflow-hidden">
+      <Card className="border-indigo-200 dark:border-indigo-800/30 shadow-md overflow-hidden">
         <Tabs defaultValue="approvals" className="w-full">
           <CardHeader className="pb-0">
             <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-indigo-50 to-indigo-100/50 dark:from-indigo-900/10 dark:to-indigo-900/20 p-1 rounded-lg">
@@ -682,7 +1145,7 @@ export default function AdminDashboard() {
 
           {/* Pending Approvals Tab */}
           <TabsContent value="approvals" className="p-0">
-            <div className="divide-y">
+            <div className="divide-y divide-indigo-100 dark:divide-indigo-800/20">
               {loading.approvals || loading.leaves || loading.complaints ? (
                 <div className="space-y-3 p-4">
                   {[1, 2, 3, 4, 5].map((i) => (
@@ -752,7 +1215,7 @@ export default function AdminDashboard() {
                               {"student" in item && (
                                 <Badge
                                   variant="outline"
-                                  className="text-xs border-indigo-200 dark:border-indigo-800 shadow-sm"
+                                  className="text-xs border-indigo-200 dark:border-indigo-800/30 shadow-sm"
                                 >
                                   {item.student.name}
                                 </Badge>
@@ -765,7 +1228,7 @@ export default function AdminDashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 shadow-sm"
+                                  className="h-8 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20 shadow-sm"
                                   onClick={() => handleApproveRequest(item._id)}
                                 >
                                   <Check className="h-4 w-4 mr-1" /> Approve
@@ -773,7 +1236,7 @@ export default function AdminDashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 shadow-sm"
+                                  className="h-8 border-red-500 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 shadow-sm"
                                   onClick={() => handleRejectRequest(item._id)}
                                 >
                                   <X className="h-4 w-4 mr-1" /> Reject
@@ -784,7 +1247,7 @@ export default function AdminDashboard() {
                               <>
                                 <Button
                                   size="sm"
-                                  className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm"
+                                  className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800/30 shadow-sm"
                                   variant="outline"
                                   onClick={() => handleApproveLeave(item._id)}
                                 >
@@ -792,7 +1255,7 @@ export default function AdminDashboard() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800 shadow-sm"
+                                  className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800/30 shadow-sm"
                                   variant="outline"
                                   onClick={() => handleRejectLeave(item._id)}
                                 >
@@ -804,7 +1267,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="default"
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-700 dark:hover:bg-indigo-800 shadow-sm"
                                 onClick={() => handleResolveComplaint(item._id)}
                               >
                                 Resolve
@@ -829,10 +1292,10 @@ export default function AdminDashboard() {
                 </>
               )}
             </div>
-            <div className="p-4 border-t text-center">
+            <div className="p-4 border-t border-indigo-100 dark:border-indigo-800/20 text-center">
               <Button
                 variant="outline"
-                className="border-indigo-300 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:border-indigo-700 dark:hover:bg-indigo-900/20 shadow-sm"
+                className="border-indigo-300 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 shadow-sm"
                 asChild
               >
                 <Link href="/dashboard/admin/approvals">View all pending items</Link>
@@ -842,7 +1305,7 @@ export default function AdminDashboard() {
 
           {/* Leave Requests Tab */}
           <TabsContent value="leaves" className="p-0">
-            <div className="divide-y">
+            <div className="divide-y divide-purple-100 dark:divide-purple-800/20">
               {loading.leaves ? (
                 <div className="space-y-3 p-4">
                   {[1, 2, 3, 4, 5].map((i) => (
@@ -862,7 +1325,7 @@ export default function AdminDashboard() {
                           <AvatarImage
                             src={
                               leave.student.userId?.profilePicture ||
-                              `https://ui-avatars.com/api/?name=${leave.student.name}&background=random`
+                              `https://ui-avatars.com/api/?name=${leave.student.name || "/placeholder.svg"}&background=random`
                             }
                             alt={leave.student.name}
                           />
@@ -873,7 +1336,10 @@ export default function AdminDashboard() {
                             <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                               {leave.student.name}
                               {leave.student.room && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-purple-200 dark:border-purple-800/30"
+                                >
                                   {leave.student.room.block}-{leave.student.room.roomNumber}
                                 </Badge>
                               )}
@@ -887,13 +1353,13 @@ export default function AdminDashboard() {
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Badge
                               variant="outline"
-                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800 shadow-sm"
+                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800/30 shadow-sm"
                             >
                               {leave.reason}
                             </Badge>
                             <Badge
                               variant="outline"
-                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800 shadow-sm"
+                              className="text-xs line-clamp-1 border-purple-200 dark:border-purple-800/30 shadow-sm"
                             >
                               To: {leave.destination}
                             </Badge>
@@ -902,7 +1368,7 @@ export default function AdminDashboard() {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800 shadow-sm"
+                            className="h-8 w-8 p-0 bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-400 border border-green-200 dark:border-green-800/30 shadow-sm"
                             variant="outline"
                             onClick={() => handleApproveLeave(leave._id)}
                           >
@@ -910,7 +1376,7 @@ export default function AdminDashboard() {
                           </Button>
                           <Button
                             size="sm"
-                            className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800 shadow-sm"
+                            className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800/30 shadow-sm"
                             variant="outline"
                             onClick={() => handleRejectLeave(leave._id)}
                           >
@@ -933,7 +1399,7 @@ export default function AdminDashboard() {
               {/* Approved Leaves Section */}
               {leaves.filter((leave) => leave.status === "approved").length > 0 && (
                 <>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b border-gray-200 dark:border-gray-700">
                     <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
                       Recently Approved Leaves
@@ -960,7 +1426,10 @@ export default function AdminDashboard() {
                               <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                                 {leave.student.name}
                                 {leave.student.room && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs border-green-200 dark:border-green-800/30"
+                                  >
                                     {leave.student.room.block}-{leave.student.room.roomNumber}
                                   </Badge>
                                 )}
@@ -981,10 +1450,10 @@ export default function AdminDashboard() {
                 </>
               )}
             </div>
-            <div className="p-4 border-t text-center">
+            <div className="p-4 border-t border-purple-100 dark:border-purple-800/20 text-center">
               <Button
                 variant="outline"
-                className="border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-700 dark:hover:bg-purple-900/20 shadow-sm"
+                className="border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20 shadow-sm"
                 asChild
               >
                 <Link href="/dashboard/admin/leave">View all leave requests</Link>
@@ -994,7 +1463,7 @@ export default function AdminDashboard() {
 
           {/* Complaints Tab */}
           <TabsContent value="complaints" className="p-0">
-            <div className="divide-y">
+            <div className="divide-y divide-orange-100 dark:divide-orange-800/20">
               {loading.complaints ? (
                 <div className="space-y-3 p-4">
                   {[1, 2, 3, 4, 5].map((i) => (
@@ -1011,7 +1480,7 @@ export default function AdminDashboard() {
                       className="p-4 hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-colors"
                     >
                       <div className="flex gap-3 items-start">
-                        <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800">
+                        <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800/30">
                           <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                         </div>
                         <div className="flex-1">
@@ -1025,11 +1494,11 @@ export default function AdminDashboard() {
                           <div className="mt-2 flex flex-wrap gap-2">
                             {getPriorityBadge(complaint.priority)}
                             {getStatusBadge(complaint.status)}
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs border-orange-200 dark:border-orange-800/30">
                               {complaint.student?.name || "Student"}
                             </Badge>
                             {complaint.student?.room && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs border-orange-200 dark:border-orange-800/30">
                                 {complaint.student.room.block}-{complaint.student.room.roomNumber}
                               </Badge>
                             )}
@@ -1038,7 +1507,7 @@ export default function AdminDashboard() {
                         <Button
                           size="sm"
                           variant="default"
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-700 dark:hover:bg-indigo-800 shadow-sm"
                           onClick={() => handleResolveComplaint(complaint._id)}
                         >
                           Resolve
@@ -1059,7 +1528,7 @@ export default function AdminDashboard() {
               {/* Resolved Complaints Section */}
               {complaints.filter((complaint) => complaint.status === "resolved").length > 0 && (
                 <>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-b border-gray-200 dark:border-gray-700">
                     <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
                       Recently Resolved Complaints
@@ -1102,10 +1571,10 @@ export default function AdminDashboard() {
                 </>
               )}
             </div>
-            <div className="p-4 border-t text-center">
+            <div className="p-4 border-t border-orange-100 dark:border-orange-800/20 text-center">
               <Button
                 variant="outline"
-                className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-700 dark:hover:bg-orange-900/20 shadow-sm"
+                className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20 shadow-sm"
                 asChild
               >
                 <Link href="/dashboard/admin/complaints">View all complaints</Link>
@@ -1116,8 +1585,8 @@ export default function AdminDashboard() {
       </Card>
 
       {/* Notices Section */}
-      <Card className="border-blue-100 dark:border-blue-900/50 shadow-md overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+      <Card className="border-blue-200 dark:border-blue-800/30 shadow-md overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-b border-blue-200 dark:border-blue-800/30">
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
@@ -1129,7 +1598,7 @@ export default function AdminDashboard() {
             <Button
               size="sm"
               variant="outline"
-              className="border-blue-300 text-blue-600 hover:bg-blue-50 flex items-center gap-1 shadow-sm"
+              className="border-blue-300 text-blue-600 hover:bg-blue-50 flex items-center gap-1 shadow-sm dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
               asChild
             >
               <Link href="/dashboard/admin/notices">
@@ -1139,7 +1608,7 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="divide-y">
+          <div className="divide-y divide-blue-100 dark:divide-blue-800/20">
             {loading.notices ? (
               <div className="space-y-3 p-4">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -1156,10 +1625,10 @@ export default function AdminDashboard() {
                       <div
                         className={`p-2 rounded-full ${
                           notice.importance === "urgent"
-                            ? "bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+                            ? "bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30"
                             : notice.importance === "important"
-                              ? "bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
-                              : "bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                              ? "bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30"
+                              : "bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30"
                         }`}
                       >
                         {getCategoryIcon(notice.category)}
@@ -1183,7 +1652,10 @@ export default function AdminDashboard() {
                             {getCategoryIcon(notice.category)}
                             {notice.category}
                           </Badge>
-                          <Badge variant="outline" className="capitalize flex items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className="capitalize flex items-center gap-1.5 border-blue-200 dark:border-blue-800/30"
+                          >
                             <Users className="h-3 w-3" />
                             {notice.targetAudience.join(", ")}
                           </Badge>
@@ -1195,10 +1667,10 @@ export default function AdminDashboard() {
                         className={`
                           ${
                             notice.importance === "urgent"
-                              ? "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
+                              ? "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
                               : notice.importance === "important"
-                                ? "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/20"
-                                : "border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
+                                ? "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                : "border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
                           }
                           shadow-sm
                         `}
@@ -1218,7 +1690,7 @@ export default function AdminDashboard() {
                 <p className="text-xs text-muted-foreground mt-1">Create a notice to inform students</p>
                 <Button
                   variant="outline"
-                  className="mt-4 border-blue-300 text-blue-600 hover:bg-blue-50 flex items-center gap-1 shadow-sm"
+                  className="mt-4 border-blue-300 text-blue-600 hover:bg-blue-50 flex items-center gap-1 shadow-sm dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
                   asChild
                 >
                   <Link href="/dashboard/admin/notices/create">
@@ -1282,7 +1754,7 @@ function MetricCard({
           <div className="mt-3 space-y-1">
             <Progress
               value={percent}
-              className={`h-1.5 ${warning ? "bg-red-100" : "bg-gray-100"} ${warning ? "bg-red-500" : textColor.replace("text-", "bg-")}`}
+              className={`h-1.5 ${warning ? "bg-red-100 dark:bg-red-900/30" : "bg-gray-100 dark:bg-gray-800"}`}
             />
             <div className="text-xs text-muted-foreground">
               {Math.round(percent)}% {warning ? "Attention needed" : "Complete"}

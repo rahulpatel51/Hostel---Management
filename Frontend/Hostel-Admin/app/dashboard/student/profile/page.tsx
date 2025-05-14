@@ -12,6 +12,26 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axios from 'axios';
 
+interface Room {
+  _id: string;
+  block: string;
+  roomNumber: string;
+  floor: string;
+  capacity: number;
+  occupiedCount: number;
+  roomType: string;
+  facilities: string[];
+  status: string;
+  description: string;
+  price: number;
+  pricePeriod: string;
+  imageUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+  currentOccupancy: number;
+}
+
 interface StudentProfile {
   _id: string;
   studentId: string;
@@ -24,7 +44,7 @@ interface StudentProfile {
   address: string;
   image: string;
   faceId: string;
-  roomId: string | null;
+  roomId: Room | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,7 +66,7 @@ export default function StudentProfilePage() {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get('http://localhost:5000/api/student/profile', {
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
@@ -86,8 +106,7 @@ export default function StudentProfilePage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      
-      // Validate image size (max 2MB)
+
       if (file.size > 2 * 1024 * 1024) {
         toast({
           title: "Error",
@@ -109,7 +128,7 @@ export default function StudentProfilePage() {
 
   const handleSaveProfile = async () => {
     if (!profile) return;
-    
+
     setIsUpdating(true);
     try {
       const token = localStorage.getItem('token');
@@ -136,7 +155,7 @@ export default function StudentProfilePage() {
           image: editProfile.image || prev.image,
           updatedAt: new Date().toISOString()
         } : null);
-        
+
         setImagePreview('');
         setIsEditing(false);
         toast({
@@ -216,15 +235,15 @@ export default function StudentProfilePage() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return isNaN(date.getTime()) 
-        ? 'Not available' 
-        : date.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
+      return isNaN(date.getTime())
+        ? 'Not available'
+        : date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
     } catch {
       return 'Not available';
     }
@@ -243,8 +262,8 @@ export default function StudentProfilePage() {
     return (
       <div className="text-center py-8">
         <p className="text-red-500">Failed to load profile data</p>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="mt-4"
           onClick={() => window.location.reload()}
         >
@@ -268,16 +287,16 @@ export default function StudentProfilePage() {
             <CardHeader className="text-center">
               <div className="flex justify-center relative group">
                 <Avatar className="h-32 w-32 relative">
-                  <AvatarImage 
-                    src={imagePreview || editProfile.image || profile.image} 
-                    alt={profile.name} 
+                  <AvatarImage
+                    src={imagePreview || editProfile.image || profile.image}
+                    alt={profile.name}
                     className="object-cover"
                   />
                   <AvatarFallback>
                     <User className="h-16 w-16" />
                   </AvatarFallback>
                   {isEditing && (
-                    <label 
+                    <label
                       htmlFor="profile-image-upload"
                       className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                     >
@@ -296,9 +315,8 @@ export default function StudentProfilePage() {
                   )}
                 </Avatar>
                 <div className="absolute bottom-0 right-0 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md">
-                  <span className={`h-3 w-3 rounded-full ${
-                    profile.status === 'Active' ? 'bg-green-500' : 'bg-red-500'
-                  }`}></span>
+                  <span className={`h-3 w-3 rounded-full ${profile.status === 'Active' ? 'bg-green-500' : 'bg-red-500'
+                    }`}></span>
                 </div>
               </div>
               <CardTitle className="mt-4 text-2xl">{profile.name}</CardTitle>
@@ -311,8 +329,8 @@ export default function StudentProfilePage() {
               <div className="flex justify-end mb-6">
                 {isEditing ? (
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setIsEditing(false);
                         setEditProfile({
@@ -326,7 +344,7 @@ export default function StudentProfilePage() {
                     >
                       Cancel
                     </Button>
-                    <Button 
+                    <Button
                       onClick={handleSaveProfile}
                       disabled={isUpdating}
                       className="min-w-[120px]"
@@ -348,8 +366,8 @@ export default function StudentProfilePage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setIsEditing(true)}
                     className="gap-2"
                   >
@@ -389,11 +407,10 @@ export default function StudentProfilePage() {
                     <div className="space-y-2">
                       <Label className="text-gray-600 dark:text-gray-300">Status</Label>
                       <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          profile.status === 'Active' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${profile.status === 'Active'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
+                          }`}>
                           {profile.status}
                         </span>
                       </div>
@@ -466,20 +483,38 @@ export default function StudentProfilePage() {
                     Room Assignment
                   </h3>
                   <Separator className="my-2" />
-                  <div className="grid gap-4 mt-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-gray-600 dark:text-gray-300">Room Number</Label>
-                      <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
-                        {profile.roomId ? profile.roomId : 'Not assigned'}
+                  {profile.roomId ? (
+                    <div className="grid gap-4 mt-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-gray-600 dark:text-gray-300">Room Number</Label>
+                        <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
+                          {profile.roomId.roomNumber}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-gray-600 dark:text-gray-300">Hostel Block</Label>
+                        <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
+                          {profile.roomId.block}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-gray-600 dark:text-gray-300">Floor</Label>
+                        <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
+                          {profile.roomId.floor}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-gray-600 dark:text-gray-300">Room Type</Label>
+                        <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
+                          {profile.roomId.roomType}
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-gray-600 dark:text-gray-300">Hostel Block</Label>
-                      <div className="p-3 rounded-md border bg-gray-50 dark:bg-gray-800">
-                        {profile.roomId ? 'Block A' : 'Not assigned'}
-                      </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-gray-500">No room assigned</p>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* System Information */}
@@ -556,7 +591,7 @@ export default function StudentProfilePage() {
                       />
                     </div>
                     <div className="flex justify-end pt-2">
-                      <Button 
+                      <Button
                         onClick={handlePasswordChange}
                         disabled={isUpdating || !currentPassword || !newPassword || !confirmPassword}
                         className="min-w-[150px]"

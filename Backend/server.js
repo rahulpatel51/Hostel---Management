@@ -14,6 +14,7 @@ import wardenRoutes from "./Routes/WardenRoutes.js";
 import roomRoutes from "./Routes/RoomRoutes.js";
 import noticeRoutes from "./Routes/NoticeRoutes.js";
 import messRoutes from "./Routes/MenuRoutes.js";
+import roomAllocationRoutes from "./Routes/roomAllocationRoutes.js";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use("/api/warden", wardenRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/menu", messRoutes);
+app.use("/api/room-allocation", roomAllocationRoutes);
 
 // Default route
 app.get("/", (req, res) => {

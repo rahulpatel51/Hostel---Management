@@ -1,7 +1,6 @@
 import User from "../Models/User.js";
 import Student from "../Models/Student.js";
 import Warden from "../Models/Warden.js";
-import Room from "../Models/Room.js";
 import Leave from "../Models/Leave.js";
 import Attendance from '../Models/Attendance.js';
 import Complaint from "../Models/Complaint.js";

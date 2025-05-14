@@ -61,7 +61,7 @@ export default function HostelAttendancePage() {
           setStudentInfo({
             name: studentData.data.name || 'Student',
             studentId: studentData.data.studentId || 'N/A',
-            room: `${studentData.data.roomId?.block || 'N/A'}-${studentData.data.roomId?.roomNumber || 'N/A'}`,
+            room: ` ${studentData.data.roomId?.roomNumber || 'N/A'}`,
             profileImage: studentData.data.image || ''
           });
         }
