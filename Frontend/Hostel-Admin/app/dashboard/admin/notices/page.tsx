@@ -389,7 +389,7 @@ export default function NoticesPage() {
         return <AlertCircle className="h-4 w-4" />
       case "academic":
         return <ClipboardList className="h-4 w-4" />
-      case "hostel":
+        case "hostel":
         return <PanelLeft className="h-4 w-4" />
       case "general":
         return <Info className="h-4 w-4" />
