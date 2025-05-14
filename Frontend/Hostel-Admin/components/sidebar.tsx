@@ -58,7 +58,7 @@ export function Sidebar({ role }: SidebarProps) {
     { name: "Attendance", href: "/dashboard/admin/attendance", icon: ClipboardCheck },
     { name: "Leave Approvals", href: "/dashboard/admin/leave", icon: Calendar },
     { name: "Complaints", href: "/dashboard/admin/complaints", icon: MessageSquare },
-    { name: "Disciplinary Actions", href: "/dashboard/admin/discipline", icon: AlertTriangle },
+    // { name: "Disciplinary Actions", href: "/dashboard/admin/discipline", icon: AlertTriangle },
     { name: "Notices", href: "/dashboard/admin/notices", icon: Bell },
     { name: "Profile", href: "/dashboard/admin/settings", icon: UserCog },
   ]

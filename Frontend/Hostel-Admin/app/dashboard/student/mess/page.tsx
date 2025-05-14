@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, Utensils, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Utensils, MessageSquare, ChevronDown, ChevronUp, AlertCircle, ChefHat } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -222,7 +222,7 @@ export default function StudentMessMenuPage() {
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
         </div>
-      ) : (
+      ) : menuItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {menuItems.map((item) => {
             const isToday = item.day === currentDayName;
@@ -379,6 +379,22 @@ export default function StudentMessMenuPage() {
               </Card>
             );
           })}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/20 mb-4">
+            <AlertCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Menu Not Available
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 max-w-md mb-6">
+            The weekly mess menu hasn't been published yet. Please check back later or contact the mess committee.
+          </p>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <ChefHat className="h-4 w-4" />
+            <span>Mess committee is working on it</span>
+          </div>
         </div>
       )}
 
