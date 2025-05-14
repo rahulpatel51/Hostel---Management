@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Bell, LogOut, User, Settings, ChevronDown, Shield } from 'lucide-react'
+import { Bell, LogOut, User, ChevronDown, Shield, Calendar, AlertCircle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -38,66 +38,150 @@ interface AdminProfile {
   lastLogin?: string
 }
 
+interface PendingItem {
+  _id: string
+  type: 'leave' | 'complaint'
+  status: 'pending' | 'approved' | 'rejected' | 'resolved'
+  title: string
+  student?: {
+    name: string
+    studentId: string
+  }
+  createdAt: string
+}
+
 export default function AdminDashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactElement<{ onActionComplete?: () => void }>
 }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [notificationCount, setNotificationCount] = useState(0)
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchAdminProfile = async () => {
-      try {
-        const token = localStorage.getItem("adminToken")
-        if (!token) {
-          router.push("/login/admin")
-          return
-        }
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
 
-        const response = await axios.get("http://localhost:5000/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.data?.success && response.data.data?.user) {
-          setProfile(response.data.data.user)
-        } else {
-          throw new Error("Failed to fetch admin profile")
-        }
-
-        // Fetch notifications count
-        try {
-          const notificationsResponse = await axios.get(
-            "http://localhost:5000/api/admin/notifications/count",
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          )
-          setNotificationCount(notificationsResponse.data?.count || 0)
-        } catch (error) {
-          console.log("Notifications endpoint not available")
-        }
-      } catch (error) {
-        console.error("Profile fetch error:", error)
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          toast.error("Session expired. Please login again.")
-          router.push("/login/admin")
-        } else {
-          toast.error("Failed to load admin profile")
-        }
-      } finally {
-        setLoading(false)
+  const fetchAdminProfile = async () => {
+    try {
+      const token = localStorage.getItem("adminToken")
+      if (!token) {
+        router.push("/login/admin")
+        return
       }
-    }
 
+      const response = await axios.get(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.data?.success && response.data.data?.user) {
+        setProfile(response.data.data.user)
+      } else {
+        throw new Error("Failed to fetch admin profile")
+      }
+    } catch (error) {
+      console.error("Profile fetch error:", error)
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        toast.error("Session expired. Please login again.")
+        router.push("/login/admin")
+      } else {
+        toast.error("Failed to load admin profile")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchPendingItems = async () => {
+    try {
+      const token = localStorage.getItem("adminToken")
+      if (!token) return
+
+      // Only fetch leaves and complaints
+      const [leavesRes, complaintsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/admin/leave?status=pending`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(error => {
+          console.error("Error fetching leaves:", error)
+          return { data: { data: [] } }
+        }),
+        
+        axios.get(`${API_BASE_URL}/admin/complaints?status=pending`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(error => {
+          console.error("Error fetching complaints:", error)
+          return { data: { data: [] } }
+        })
+      ])
+
+      // Helper function to safely extract data
+      const getData = (response: any) => {
+        return response?.data?.data || []
+      }
+
+      // Transform leaves data
+      const pendingLeaves = getData(leavesRes).map((leave: any) => ({
+        _id: leave._id,
+        type: 'leave',
+        status: leave.status || 'pending',
+        title: `${leave.student?.name || 'Student'} - Leave Request`,
+        student: leave.student || { name: 'Unknown', studentId: 'N/A' },
+        createdAt: leave.createdAt || new Date().toISOString()
+      }))
+
+      // Transform complaints data
+      const pendingComplaints = getData(complaintsRes).map((complaint: any) => ({
+        _id: complaint._id,
+        type: 'complaint',
+        status: complaint.status || 'pending',
+        title: `${complaint.student?.name || 'Student'} - ${complaint.type || 'Complaint'}`,
+        student: complaint.student || { name: 'Unknown', studentId: 'N/A' },
+        createdAt: complaint.createdAt || new Date().toISOString()
+      }))
+
+      // Combine and sort items
+      const allPendingItems = [
+        ...pendingLeaves,
+        ...pendingComplaints.filter((item: { status: string }) => item.status !== 'resolved')
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      setPendingItems(allPendingItems)
+    } catch (error) {
+      console.error("Failed to fetch pending items:", error)
+      toast.error("Failed to load pending items. Please try again.")
+    }
+  }
+
+  const handleNotificationClick = (item: PendingItem) => {
+    switch (item.type) {
+      case 'leave':
+        router.push(`/dashboard/admin/leaves/${item._id}`)
+        break
+      case 'complaint':
+        router.push(`/dashboard/admin/complaints/${item._id}`)
+        break
+    }
+    setShowNotifications(false)
+  }
+
+  const handleActionComplete = () => {
+    fetchPendingItems()
+  }
+
+  useEffect(() => {
     fetchAdminProfile()
-  }, [router])
+    fetchPendingItems()
+
+    const interval = setInterval(fetchPendingItems, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken")
@@ -105,8 +189,15 @@ export default function AdminDashboardLayout({
     toast.success("Logged out successfully")
   }
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'leave':
+        return <Calendar className="h-4 w-4 text-blue-500" />
+      case 'complaint':
+        return <AlertCircle className="h-4 w-4 text-orange-500" />
+      default:
+        return <Bell className="h-4 w-4" />
+    }
   }
 
   return (
@@ -134,14 +225,82 @@ export default function AdminDashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               <ModeToggle />
-              <Button variant="outline" size="icon" className="relative border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
-                <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                {notificationCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 dark:bg-indigo-500 text-[10px] text-white p-0 min-w-0">
-                    {notificationCount}
-                  </Badge>
+              
+              {/* Pending Items Dropdown */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="relative border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                  onClick={() => setShowNotifications(!showNotifications)}
+                >
+                  <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  {pendingItems.length > 0 && (
+                    <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 dark:bg-indigo-500 text-[10px] text-white p-0 min-w-0">
+                      {pendingItems.length}
+                    </Badge>
+                  )}
+                </Button>
+                
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-30">
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="font-medium text-gray-900 dark:text-white">Pending Items</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {pendingItems.length} items requiring attention
+                      </p>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {pendingItems.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No pending items
+                        </div>
+                      ) : (
+                        pendingItems.map(item => (
+                          <div
+                            key={`${item.type}-${item._id}`}
+                            className="p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                            onClick={() => handleNotificationClick(item)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="mt-1">
+                                {getNotificationIcon(item.type)}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {item.title}
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {item.student?.studentId || 'N/A'} • {new Date(item.createdAt).toLocaleString()}
+                                </p>
+                                <div className="mt-2">
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {item.type}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-indigo-600 dark:text-indigo-400"
+                        onClick={() => {
+                          setShowNotifications(false)
+                        }}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </div>
                 )}
-              </Button>
+              </div>
+
+              {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative flex items-center gap-2 rounded-full px-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
@@ -218,7 +377,10 @@ export default function AdminDashboardLayout({
           <main className="flex-1 overflow-auto p-6 pt-4 bg-transparent">
             <div className="mx-auto max-w-7xl">
               <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/30 bg-white dark:bg-gray-900 p-6 shadow-sm">
-                {children}
+                {React.isValidElement(children) &&
+                  React.cloneElement(children, { 
+                    onActionComplete: handleActionComplete 
+                  })}
               </div>
             </div>
           </main>
