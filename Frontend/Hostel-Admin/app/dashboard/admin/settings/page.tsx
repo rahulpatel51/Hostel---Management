@@ -9,20 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { 
-  Mail, 
-  Phone, 
-  User, 
-  Lock,
-  Shield,
-  Settings as SettingsIcon,
-  KeyRound,
-  Edit,
-  Image as ImageIcon,
-  Calendar,
-  Loader2,
-  CheckCircle
-} from "lucide-react";
+import { Mail, Phone, User, Lock, Shield, SettingsIcon, KeyRound, Edit, ImageIcon, Calendar, Loader2, CheckCircle } from 'lucide-react';
 import axios from "axios";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -288,213 +275,216 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-          <SettingsIcon className="h-6 w-6 text-primary" />
-          Account Settings
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Manage your account information and security settings
-        </p>
-      </div>
+    <div className="container mx-auto py-8">
+      <div className="flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex flex-col gap-2 bg-gradient-to-r from-purple-50 to-emerald-50 dark:from-purple-950/20 dark:to-emerald-950/20 p-6 rounded-lg border">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent">
+            Account Settings
+          </h1>
+          <p className="text-muted-foreground">Manage your account information and security settings</p>
+        </div>
 
-      <Tabs defaultValue="profile" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg">
-          <TabsTrigger 
-            value="profile" 
-            className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 rounded-md"
-          >
-            <User className="h-4 w-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger 
-            value="security" 
-            className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 rounded-md"
-          >
-            <Shield className="h-4 w-4" />
-            Security
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="profile" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2 bg-muted/80">
+            <TabsTrigger
+              value="profile"
+              className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-900 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-100"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger
+              value="security"
+              className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-100"
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Security
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="mt-6">
-          <Card className="border-0 shadow-sm bg-white dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-3 text-gray-900 dark:text-white">
-                <User className="h-5 w-5 text-primary" />
-                Personal Information
-              </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                Update your personal details and contact information
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading.fetchProfile ? (
-                <div className="flex justify-center items-center h-64">
-                  <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="relative group">
-                      <Avatar className="h-32 w-32 border-4 border-primary/20">
-                        <AvatarImage src={adminProfile.profilePicture} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-white text-3xl font-semibold">
-                          {adminProfile.firstName.charAt(0)}{adminProfile.lastName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Edit className="h-6 w-6 text-white" />
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="gap-2"
-                      onClick={() => setIsProfileDialogOpen(true)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit Profile
-                    </Button>
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="mt-6">
+            <Card className="border-purple-200 dark:border-purple-800/30 shadow-sm">
+              <CardHeader className="bg-purple-50 dark:bg-purple-950/20 rounded-t-lg border-b border-purple-100 dark:border-purple-800/20">
+                <CardTitle className="text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                  <User className="h-5 w-5 text-purple-600" />
+                  Personal Information
+                </CardTitle>
+                <CardDescription>
+                  Update your personal details and contact information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                {isLoading.fetchProfile ? (
+                  <div className="flex justify-center items-center h-64">
+                    <Loader2 className="animate-spin h-8 w-8 text-purple-500" />
                   </div>
-
-                  <Separator className="my-4 bg-gray-200 dark:bg-gray-700" />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">First Name</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700">
-                        <p className="text-gray-900 dark:text-white font-medium">{adminProfile.firstName}</p>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="relative group">
+                        <Avatar className="h-32 w-32 border-4 border-purple-200 dark:border-purple-800/30">
+                          <AvatarImage src={adminProfile.profilePicture || "/placeholder.svg"} />
+                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-400 text-white text-3xl font-semibold">
+                            {adminProfile.firstName.charAt(0)}{adminProfile.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Edit className="h-6 w-6 text-white" />
+                        </div>
                       </div>
+                      <Button 
+                        variant="outline" 
+                        className="gap-2 border-purple-200 dark:border-purple-800/30 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                        onClick={() => setIsProfileDialogOpen(true)}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Profile
+                      </Button>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">Last Name</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700">
-                        <p className="text-gray-900 dark:text-white font-medium">{adminProfile.lastName}</p>
-                      </div>
-                    </div>
+                    <Separator className="my-4 bg-purple-100 dark:bg-purple-800/20" />
 
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">Email</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700 flex items-center gap-3">
-                        <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        <p className="text-gray-900 dark:text-white font-medium">{adminProfile.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">Phone</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700 flex items-center gap-3">
-                        <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        <p className="text-gray-900 dark:text-white font-medium">
-                          {adminProfile.phone || "Not provided"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">Admin Code</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700 flex items-center gap-3">
-                        <KeyRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        <p className="text-gray-900 dark:text-white font-medium">{adminProfile.adminCode}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-700 dark:text-gray-300">Status</Label>
-                      <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700">
-                        {adminProfile.isActive ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
-                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {adminProfile.lastLogin && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-gray-700 dark:text-gray-300">Last Login</Label>
-                        <div className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700 flex items-center gap-3">
-                          <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                          <p className="text-gray-900 dark:text-white font-medium">
-                            {new Date(adminProfile.lastLogin).toLocaleString()}
+                        <Label className="text-purple-700 dark:text-purple-300">First Name</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10">
+                          <p className="text-purple-900 dark:text-purple-100 font-medium">{adminProfile.firstName}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 dark:text-purple-300">Last Name</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10">
+                          <p className="text-purple-900 dark:text-purple-100 font-medium">{adminProfile.lastName}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 dark:text-purple-300">Email</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10 flex items-center gap-3">
+                          <Mail className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+                          <p className="text-purple-900 dark:text-purple-100 font-medium">{adminProfile.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 dark:text-purple-300">Phone</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10 flex items-center gap-3">
+                          <Phone className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+                          <p className="text-purple-900 dark:text-purple-100 font-medium">
+                            {adminProfile.phone || "Not provided"}
                           </p>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Security Tab */}
-        <TabsContent value="security" className="mt-6">
-          <Card className="border-0 shadow-sm bg-white dark:bg-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-3 text-gray-900 dark:text-white">
-                <Shield className="h-5 w-5 text-primary" />
-                Security Settings
-              </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                Manage your account security and password
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-lg border p-6 bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">Password</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      Last changed {adminProfile.updatedAt ? new Date(adminProfile.updatedAt).toLocaleDateString() : "unknown"}
-                    </p>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="gap-2 w-full md:w-auto"
-                    onClick={() => setIsPasswordDialogOpen(true)}
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    Change Password
-                  </Button>
-                </div>
-              </div>
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 dark:text-purple-300">Admin Code</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10 flex items-center gap-3">
+                          <KeyRound className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+                          <p className="text-purple-900 dark:text-purple-100 font-medium">{adminProfile.adminCode}</p>
+                        </div>
+                      </div>
 
-              <div className="rounded-lg border p-6 bg-gray-50 dark:bg-gray-700/30 dark:border-gray-700">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">Two-Factor Authentication</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      Add an extra layer of security to your account
-                    </p>
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 dark:text-purple-300">Status</Label>
+                        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10">
+                          {adminProfile.isActive ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {adminProfile.lastLogin && (
+                        <div className="space-y-2">
+                          <Label className="text-purple-700 dark:text-purple-300">Last Login</Label>
+                          <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800/30 bg-purple-50/50 dark:bg-purple-900/10 flex items-center gap-3">
+                            <Calendar className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+                            <p className="text-purple-900 dark:text-purple-100 font-medium">
+                              {new Date(adminProfile.lastLogin).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <Button variant="outline" className="w-full md:w-auto">
-                    Enable 2FA
-                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security" className="mt-6">
+            <Card className="border-emerald-200 dark:border-emerald-800/30 shadow-sm">
+              <CardHeader className="bg-emerald-50 dark:bg-emerald-950/20 rounded-t-lg border-b border-emerald-100 dark:border-emerald-800/20">
+                <CardTitle className="text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                  Security Settings
+                </CardTitle>
+                <CardDescription>
+                  Manage your account security and password
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className="rounded-lg border p-6 bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <h3 className="font-medium text-emerald-900 dark:text-emerald-100">Password</h3>
+                      <p className="text-sm text-emerald-700/70 dark:text-emerald-300/70 mt-1">
+                        Last changed {adminProfile.updatedAt ? new Date(adminProfile.updatedAt).toLocaleDateString() : "unknown"}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      className="gap-2 w-full md:w-auto border-emerald-200 dark:border-emerald-800/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                      onClick={() => setIsPasswordDialogOpen(true)}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      Change Password
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+                <div className="rounded-lg border p-6 bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <h3 className="font-medium text-emerald-900 dark:text-emerald-100">Two-Factor Authentication</h3>
+                      <p className="text-sm text-emerald-700/70 dark:text-emerald-300/70 mt-1">
+                        Add an extra layer of security to your account
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      className="w-full md:w-auto border-emerald-200 dark:border-emerald-800/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                    >
+                      Enable 2FA
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Edit Profile Dialog */}
       <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-lg">
+        <DialogContent className="sm:max-w-[600px] rounded-lg border-purple-200 dark:border-purple-800/30">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-gray-900 dark:text-white">
-              <User className="h-5 w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-3 text-purple-900 dark:text-purple-100">
+              <User className="h-5 w-5 text-purple-600" />
               Edit Profile
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
+            <DialogDescription>
               Update your profile information
             </DialogDescription>
           </DialogHeader>
@@ -510,9 +500,9 @@ export default function SettingsPage() {
             
             <div className="flex flex-col items-center gap-4">
               <div className="relative group">
-                <Avatar className="h-32 w-32 border-4 border-primary/20">
+                <Avatar className="h-32 w-32 border-4 border-purple-200 dark:border-purple-800/30">
                   <AvatarImage src={tempImage || adminProfile.profilePicture} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-white text-3xl font-semibold">
+                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-400 text-white text-3xl font-semibold">
                     {adminProfile.firstName.charAt(0)}{adminProfile.lastName.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
@@ -524,7 +514,7 @@ export default function SettingsPage() {
               </div>
               <Button 
                 variant="outline" 
-                className="gap-2"
+                className="gap-2 border-purple-200 dark:border-purple-800/30 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                 onClick={triggerFileInput}
                 disabled={isLoading.imageUpload}
               >
@@ -544,7 +534,7 @@ export default function SettingsPage() {
             
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName" className="text-purple-700 dark:text-purple-300">First Name</Label>
                 <Input 
                   id="firstName" 
                   value={adminProfile.firstName}
@@ -552,11 +542,11 @@ export default function SettingsPage() {
                     ...prev,
                     firstName: e.target.value
                   }))}
-                  className="bg-white dark:bg-gray-800"
+                  className="border-purple-200 dark:border-purple-800/30 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName" className="text-purple-700 dark:text-purple-300">Last Name</Label>
                 <Input 
                   id="lastName" 
                   value={adminProfile.lastName}
@@ -564,15 +554,15 @@ export default function SettingsPage() {
                     ...prev,
                     lastName: e.target.value
                   }))}
-                  className="bg-white dark:bg-gray-800"
+                  className="border-purple-200 dark:border-purple-800/30 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 />
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-purple-700 dark:text-purple-300">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-500 dark:text-purple-400" />
                 <Input
                   id="email"
                   type="email"
@@ -581,15 +571,15 @@ export default function SettingsPage() {
                     ...prev,
                     email: e.target.value
                   }))}
-                  className="pl-10 bg-white dark:bg-gray-800"
+                  className="pl-10 border-purple-200 dark:border-purple-800/30 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 />
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone" className="text-purple-700 dark:text-purple-300">Phone</Label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-500 dark:text-purple-400" />
                 <Input
                   id="phone"
                   type="tel"
@@ -598,7 +588,7 @@ export default function SettingsPage() {
                     ...prev,
                     phone: e.target.value
                   }))}
-                  className="pl-10 bg-white dark:bg-gray-800"
+                  className="pl-10 border-purple-200 dark:border-purple-800/30 focus-visible:ring-purple-500/30 focus-visible:border-purple-500/50"
                 />
               </div>
             </div>
@@ -607,14 +597,14 @@ export default function SettingsPage() {
             <Button 
               variant="outline" 
               onClick={() => setIsProfileDialogOpen(false)}
-              className="border-gray-300 dark:border-gray-600"
+              className="border-purple-200 dark:border-purple-800/30 hover:bg-purple-50 dark:hover:bg-purple-900/20"
             >
               Cancel
             </Button>
             <Button 
               onClick={saveProfile}
               disabled={isLoading.profile}
-              className="gap-2"
+              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white"
             >
               {isLoading.profile ? (
                 <>
@@ -631,21 +621,21 @@ export default function SettingsPage() {
 
       {/* Change Password Dialog */}
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-lg">
+        <DialogContent className="sm:max-w-[500px] rounded-lg border-emerald-200 dark:border-emerald-800/30">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-gray-900 dark:text-white">
-              <KeyRound className="h-5 w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-3 text-emerald-900 dark:text-emerald-100">
+              <KeyRound className="h-5 w-5 text-emerald-600" />
               Change Password
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
+            <DialogDescription>
               Enter your current password and set a new one
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current Password</Label>
+              <Label htmlFor="currentPassword" className="text-emerald-700 dark:text-emerald-300">Current Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-500 dark:text-emerald-400" />
                 <Input 
                   id="currentPassword" 
                   type="password"
@@ -654,16 +644,16 @@ export default function SettingsPage() {
                     ...prev,
                     currentPassword: e.target.value
                   }))}
-                  className="pl-10 bg-white dark:bg-gray-800"
+                  className="pl-10 border-emerald-200 dark:border-emerald-800/30 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50"
                   placeholder="Enter current password"
                 />
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="newPassword" className="text-emerald-700 dark:text-emerald-300">New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-500 dark:text-emerald-400" />
                 <Input 
                   id="newPassword" 
                   type="password"
@@ -672,16 +662,16 @@ export default function SettingsPage() {
                     ...prev,
                     newPassword: e.target.value
                   }))}
-                  className="pl-10 bg-white dark:bg-gray-800"
+                  className="pl-10 border-emerald-200 dark:border-emerald-800/30 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50"
                   placeholder="At least 8 characters"
                 />
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Label htmlFor="confirmPassword" className="text-emerald-700 dark:text-emerald-300">Confirm New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-500 dark:text-emerald-400" />
                 <Input 
                   id="confirmPassword" 
                   type="password"
@@ -690,7 +680,7 @@ export default function SettingsPage() {
                     ...prev,
                     confirmPassword: e.target.value
                   }))}
-                  className="pl-10 bg-white dark:bg-gray-800"
+                  className="pl-10 border-emerald-200 dark:border-emerald-800/30 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50"
                   placeholder="Confirm your new password"
                 />
               </div>
@@ -700,14 +690,14 @@ export default function SettingsPage() {
             <Button 
               variant="outline" 
               onClick={() => setIsPasswordDialogOpen(false)}
-              className="border-gray-300 dark:border-gray-600"
+              className="border-emerald-200 dark:border-emerald-800/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
             >
               Cancel
             </Button>
             <Button 
               onClick={changePassword}
               disabled={isLoading.password}
-              className="gap-2"
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {isLoading.password ? (
                 <>

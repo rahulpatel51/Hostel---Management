@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Bell, LogOut, User, ChevronDown, Shield, Calendar, AlertCircle } from 'lucide-react'
+import { Bell, LogOut, User, ChevronDown, Shield, Calendar, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -39,9 +39,10 @@ interface AdminProfile {
 }
 
 interface PendingItem {
+  roomNumber: any
   _id: string
-  type: 'leave' | 'complaint'
-  status: 'pending' | 'approved' | 'rejected' | 'resolved'
+  type: "leave" | "complaint"
+  status: "pending" | "approved" | "rejected" | "resolved"
   title: string
   student?: {
     name: string
@@ -58,6 +59,7 @@ export default function AdminDashboardLayout({
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([])
+  const notificationRef = useRef<HTMLDivElement>(null)
   const [showNotifications, setShowNotifications] = useState(false)
   const router = useRouter()
 
@@ -102,19 +104,23 @@ export default function AdminDashboardLayout({
 
       // Only fetch leaves and complaints
       const [leavesRes, complaintsRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/admin/leave?status=pending`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(error => {
-          console.error("Error fetching leaves:", error)
-          return { data: { data: [] } }
-        }),
-        
-        axios.get(`${API_BASE_URL}/admin/complaints?status=pending`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(error => {
-          console.error("Error fetching complaints:", error)
-          return { data: { data: [] } }
-        })
+        axios
+          .get(`${API_BASE_URL}/admin/leave?status=pending`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .catch((error) => {
+            console.error("Error fetching leaves:", error)
+            return { data: { data: [] } }
+          }),
+
+        axios
+          .get(`${API_BASE_URL}/admin/complaints?status=pending`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .catch((error) => {
+            console.error("Error fetching complaints:", error)
+            return { data: { data: [] } }
+          }),
       ])
 
       // Helper function to safely extract data
@@ -125,27 +131,27 @@ export default function AdminDashboardLayout({
       // Transform leaves data
       const pendingLeaves = getData(leavesRes).map((leave: any) => ({
         _id: leave._id,
-        type: 'leave',
-        status: leave.status || 'pending',
-        title: `${leave.student?.name || 'Student'} - Leave Request`,
-        student: leave.student || { name: 'Unknown', studentId: 'N/A' },
-        createdAt: leave.createdAt || new Date().toISOString()
+        type: "leave",
+        status: leave.status || "pending",
+        title: `${leave.student?.name || "Student"} - Leave Request`,
+        student: leave.student || { name: "Unknown" },
+        createdAt: leave.createdAt || new Date().toISOString(),
       }))
 
       // Transform complaints data
       const pendingComplaints = getData(complaintsRes).map((complaint: any) => ({
         _id: complaint._id,
-        type: 'complaint',
-        status: complaint.status || 'pending',
-        title: `${complaint.student?.name || 'Student'} - ${complaint.type || 'Complaint'}`,
-        student: complaint.student || { name: 'Unknown', studentId: 'N/A' },
-        createdAt: complaint.createdAt || new Date().toISOString()
+        type: "complaint",
+        status: complaint.status || "pending",
+        title: `${complaint.student?.name || "Student"} - ${complaint.type || "Complaint"}`,
+        student: complaint.student || { name: "Unknown" },
+        createdAt: complaint.createdAt || new Date().toISOString(),
       }))
 
       // Combine and sort items
       const allPendingItems = [
         ...pendingLeaves,
-        ...pendingComplaints.filter((item: { status: string }) => item.status !== 'resolved')
+        ...pendingComplaints.filter((item: { status: string }) => item.status !== "resolved"),
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
       setPendingItems(allPendingItems)
@@ -157,10 +163,10 @@ export default function AdminDashboardLayout({
 
   const handleNotificationClick = (item: PendingItem) => {
     switch (item.type) {
-      case 'leave':
+      case "leave":
         router.push(`/dashboard/admin/leaves/${item._id}`)
         break
-      case 'complaint':
+      case "complaint":
         router.push(`/dashboard/admin/complaints/${item._id}`)
         break
     }
@@ -179,6 +185,34 @@ export default function AdminDashboardLayout({
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    // Function to handle clicks outside the notification dropdown
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+
+    // Function to handle scroll events
+    const handleScroll = () => {
+      if (showNotifications) {
+        setShowNotifications(false)
+      }
+    }
+
+    // Add event listeners if notifications are shown
+    if (showNotifications) {
+      document.addEventListener("mousedown", handleClickOutside)
+      document.addEventListener("scroll", handleScroll, true)
+    }
+
+    // Clean up event listeners
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("scroll", handleScroll, true)
+    }
+  }, [showNotifications])
+
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
   }
@@ -191,9 +225,9 @@ export default function AdminDashboardLayout({
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'leave':
+      case "leave":
         return <Calendar className="h-4 w-4 text-blue-500" />
-      case 'complaint':
+      case "complaint":
         return <AlertCircle className="h-4 w-4 text-orange-500" />
       default:
         return <Bell className="h-4 w-4" />
@@ -210,7 +244,7 @@ export default function AdminDashboardLayout({
         </title>
         <meta name="description" content="Administrative dashboard for managing hostel operations" />
       </Head>
-      
+
       <div className="flex min-h-screen bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/30 dark:from-indigo-950/30 dark:via-gray-900 dark:to-purple-950/20">
         <Sidebar role="admin" />
         <div className="flex-1 flex flex-col pl-0 lg:pl-72">
@@ -225,12 +259,12 @@ export default function AdminDashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               <ModeToggle />
-              
+
               {/* Pending Items Dropdown */}
-              <div className="relative">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+              <div className="relative" ref={notificationRef}>
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="relative border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
@@ -241,37 +275,29 @@ export default function AdminDashboardLayout({
                     </Badge>
                   )}
                 </Button>
-                
+
                 {showNotifications && (
                   <div className="absolute right-0 mt-2 w-80 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-30">
                     <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="font-medium text-gray-900 dark:text-white">Pending Items</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {pendingItems.length} items requiring attention
-                      </p>
+                      <p className="text-xs text-muted-foreground">{pendingItems.length} items requiring attention</p>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {pendingItems.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
-                          No pending items
-                        </div>
+                        <div className="p-4 text-center text-sm text-muted-foreground">No pending items</div>
                       ) : (
-                        pendingItems.map(item => (
+                        pendingItems.map((item) => (
                           <div
                             key={`${item.type}-${item._id}`}
                             className="p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                             onClick={() => handleNotificationClick(item)}
                           >
                             <div className="flex items-start gap-3">
-                              <div className="mt-1">
-                                {getNotificationIcon(item.type)}
-                              </div>
+                              <div className="mt-1">{getNotificationIcon(item.type)}</div>
                               <div className="flex-1">
-                                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {item.title}
-                                </h4>
+                                <h4 className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</h4>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {item.student?.studentId || 'N/A'} • {new Date(item.createdAt).toLocaleString()}
+                                  {item.roomNumber?.roomNumber || "N/A"} • {new Date(item.createdAt).toLocaleString()}
                                 </p>
                                 <div className="mt-2">
                                   <Badge variant="outline" className="text-xs capitalize">
@@ -303,12 +329,18 @@ export default function AdminDashboardLayout({
               {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative flex items-center gap-2 rounded-full px-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
+                  <Button
+                    variant="ghost"
+                    className="relative flex items-center gap-2 rounded-full px-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                  >
                     {loading ? (
                       <Skeleton className="h-8 w-8 rounded-full" />
                     ) : (
                       <Avatar className="h-8 w-8 border-2 border-indigo-200 dark:border-indigo-800">
-                        <AvatarImage src={profile?.profilePicture || "/placeholder.svg"} alt={`${profile?.firstName} ${profile?.lastName}`} />
+                        <AvatarImage
+                          src={profile?.profilePicture || "/placeholder.svg"}
+                          alt={`${profile?.firstName} ${profile?.lastName}`}
+                        />
                         <AvatarFallback className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
                           {profile ? getInitials(profile.firstName, profile.lastName) : "AD"}
                         </AvatarFallback>
@@ -317,8 +349,10 @@ export default function AdminDashboardLayout({
                     <span className="hidden md:inline text-sm font-medium">
                       {loading ? (
                         <Skeleton className="h-4 w-20" />
+                      ) : profile ? (
+                        `${profile.firstName} ${profile.lastName}`
                       ) : (
-                        profile ? `${profile.firstName} ${profile.lastName}` : "Admin User"
+                        "Admin User"
                       )}
                     </span>
                     <ChevronDown className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
@@ -346,13 +380,9 @@ export default function AdminDashboardLayout({
                           <p className="text-sm font-medium">
                             {profile ? `${profile.firstName} ${profile.lastName}` : "Admin User"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {profile?.email || "admin@hostelhub.com"}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{profile?.email || "admin@hostelhub.com"}</p>
                           {profile?.adminCode && (
-                            <p className="text-xs text-muted-foreground">
-                              Admin Code: {profile.adminCode}
-                            </p>
+                            <p className="text-xs text-muted-foreground">Admin Code: {profile.adminCode}</p>
                           )}
                         </div>
                       </DropdownMenuLabel>
@@ -378,8 +408,8 @@ export default function AdminDashboardLayout({
             <div className="mx-auto max-w-7xl">
               <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/30 bg-white dark:bg-gray-900 p-6 shadow-sm">
                 {React.isValidElement(children) &&
-                  React.cloneElement(children, { 
-                    onActionComplete: handleActionComplete 
+                  React.cloneElement(children, {
+                    onActionComplete: handleActionComplete,
                   })}
               </div>
             </div>

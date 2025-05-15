@@ -426,12 +426,13 @@ export default function NoticesPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6 text-gray-200 min-h-screen">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight text-purple-400 bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
-          Notices Management
-        </h1>
-        <p className="text-gray-400">Create and manage notices and announcements for your institution</p>
-      </div>
+      {/* Header */}
+        <div className="flex flex-col gap-2 bg-gradient-to-r from-purple-50 to-emerald-50 dark:from-purple-950/20 dark:to-emerald-950/20 p-6 rounded-lg border">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent">
+             Notices Management
+          </h1>
+          <p className="text-muted-foreground">Create and manage notices and announcements for your institution</p>
+        </div>
 
       <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 max-w-md bg-gray-900 border border-gray-800">
