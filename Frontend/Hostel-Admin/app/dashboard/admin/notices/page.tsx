@@ -21,28 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  ClipboardList,
-  Download,
-  Edit,
-  Eye,
-  FileText,
-  Filter,
-  Info,
-  Loader2,
-  MoreHorizontal,
-  PanelLeft,
-  Plus,
-  Search,
-  Send,
-  Tag,
-  Trash2,
-  Upload,
-  Users,
-} from "lucide-react"
+import { AlertCircle, Calendar, CheckCircle2, ClipboardList, Download, Edit, Eye, FileText, Filter, Info, Loader2, MoreHorizontal, PanelLeft, Plus, Search, Send, Tag, Trash2, Upload, Users } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -165,6 +144,20 @@ export default function NoticesPage() {
 
     fetchNotices()
   }, [])
+
+  useEffect(() => {
+    // Check if there's an ID in the URL query parameters
+    const params = new URLSearchParams(window.location.search)
+    const noticeId = params.get("id")
+
+    if (noticeId && notices.length > 0) {
+      const notice = notices.find((n) => n._id === noticeId)
+      if (notice) {
+        setSelectedNotice(notice)
+        setIsViewDialogOpen(true)
+      }
+    }
+  }, [notices])
 
   const filteredNotices = notices.filter((notice) => {
     const matchesSearch =
@@ -389,7 +382,7 @@ export default function NoticesPage() {
         return <AlertCircle className="h-4 w-4" />
       case "academic":
         return <ClipboardList className="h-4 w-4" />
-        case "hostel":
+      case "hostel":
         return <PanelLeft className="h-4 w-4" />
       case "general":
         return <Info className="h-4 w-4" />
@@ -427,12 +420,12 @@ export default function NoticesPage() {
   return (
     <div className="flex flex-col gap-6 p-6 text-gray-200 min-h-screen">
       {/* Header */}
-        <div className="flex flex-col gap-2 bg-gradient-to-r from-purple-50 to-emerald-50 dark:from-purple-950/20 dark:to-emerald-950/20 p-6 rounded-lg border">
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent">
-             Notices Management
-          </h1>
-          <p className="text-muted-foreground">Create and manage notices and announcements for your institution</p>
-        </div>
+      <div className="flex flex-col gap-2 bg-gradient-to-r from-purple-50 to-emerald-50 dark:from-purple-950/20 dark:to-emerald-950/20 p-6 rounded-lg border">
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent">
+          Notices Management
+        </h1>
+        <p className="text-muted-foreground">Create and manage notices and announcements for your institution</p>
+      </div>
 
       <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 max-w-md bg-gray-900 border border-gray-800">
@@ -582,6 +575,11 @@ export default function NoticesPage() {
                                       onClick={() => {
                                         setSelectedNotice(notice)
                                         setIsViewDialogOpen(true)
+                                        window.history.pushState(
+                                          {},
+                                          "",
+                                          `http://localhost:3000/dashboard/admin/notices?id=${notice._id}`,
+                                        )
                                       }}
                                       className="flex items-center cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
                                     >
@@ -592,6 +590,11 @@ export default function NoticesPage() {
                                       onClick={() => {
                                         setSelectedNotice({ ...notice })
                                         setIsEditDialogOpen(true)
+                                        window.history.pushState(
+                                          {},
+                                          "",
+                                          `http://localhost:3000/dashboard/admin/notices?id=${notice._id}`
+                                        )
                                       }}
                                       className="flex items-center cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
                                     >
@@ -1090,8 +1093,15 @@ export default function NoticesPage() {
       </Tabs>
 
       {/* View Notice Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0 border-gray-800 bg-gray-900">
+      <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
+        setIsViewDialogOpen(open)
+        if (!open) {
+          window.history.pushState({}, "", "/dashboard/admin/notices")
+        }
+      }}>
+        <DialogContent
+          className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0 border-gray-800 bg-gray-900"
+        >
           <DialogHeader className="p-6 pb-2 bg-gray-900/80 border-b border-gray-800">
             <DialogTitle className="text-xl text-purple-300">{selectedNotice?.title}</DialogTitle>
             {/* Fix: Replace DialogDescription with div to avoid nesting Badge (div) inside p element */}
@@ -1217,7 +1227,12 @@ export default function NoticesPage() {
       </Dialog>
 
       {/* Edit Notice Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open)
+        if (!open) {
+          window.history.pushState({}, "", "/dashboard/admin/notices")
+        }
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0 border-gray-800 bg-gray-900">
           <DialogHeader className="p-6 pb-2 bg-gray-900/80 border-b border-gray-800">
             <DialogTitle className="flex items-center gap-2 text-purple-300">

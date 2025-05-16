@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -46,6 +47,8 @@ type Complaint = {
 }
 
 export default function ComplaintsManagementPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>([])
@@ -58,7 +61,12 @@ export default function ComplaintsManagementPage() {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [isFetchingDetails, setIsFetchingDetails] = useState(false)
 
+  // Check for complaint ID in URL on component mount
   useEffect(() => {
+    const complaintId = searchParams.get('id')
+    if (complaintId) {
+      fetchComplaintDetails(complaintId)
+    }
     fetchComplaints()
   }, [])
 
@@ -88,6 +96,18 @@ export default function ComplaintsManagementPage() {
 
       setComplaints(complaintsArray)
       setFilteredComplaints(complaintsArray)
+
+      // If there's a complaint ID in URL but no selected complaint yet
+      const complaintId = searchParams.get('id')
+      if (complaintId && !selectedComplaint) {
+        const complaint = complaintsArray.find(c => c._id === complaintId)
+        if (complaint) {
+          setSelectedComplaint(complaint)
+        } else {
+          // If not found in initial fetch, fetch details separately
+          fetchComplaintDetails(complaintId)
+        }
+      }
     } catch (error: any) {
       console.error("Fetch error:", error)
       toast({
@@ -114,6 +134,10 @@ export default function ComplaintsManagementPage() {
         credentials: "include",
       })
 
+      if (!response.ok) {
+        throw new Error("Failed to fetch complaint details")
+      }
+
       const data = await response.json()
       setSelectedComplaint(data)
     } catch (error: any) {
@@ -123,14 +147,25 @@ export default function ComplaintsManagementPage() {
         variant: "destructive",
         duration: 3000,
       })
+      // Remove invalid ID from URL
+      if (searchParams.get('id') === id) {
+        router.replace('/dashboard/admin/complaints')
+      }
     } finally {
       setIsFetchingDetails(false)
     }
   }
 
   const handleRowClick = (complaint: Complaint) => {
+    // Update URL with complaint ID
+    router.push(`/dashboard/admin/complaints?id=${complaint._id}`, { scroll: false })
     setSelectedComplaint(complaint)
-    fetchComplaintDetails(complaint._id)
+  }
+
+  const handleDialogClose = () => {
+    // Remove the ID from URL when dialog is closed
+    router.push('/dashboard/admin/complaints', { scroll: false })
+    setSelectedComplaint(null)
   }
 
   const getUsernameFromEmail = (email: string) => {
@@ -187,6 +222,11 @@ export default function ComplaintsManagementPage() {
         prev.map((complaint) => (complaint._id === updatedComplaint._id ? updatedComplaint : complaint)),
       )
 
+      // Update selected complaint if it's the one being updated
+      if (selectedComplaint?._id === updatedComplaint._id) {
+        setSelectedComplaint(updatedComplaint)
+      }
+
       toast({
         title: "Success",
         description: `Status updated to ${newStatus.replace("_", " ")}`,
@@ -228,13 +268,16 @@ export default function ComplaintsManagementPage() {
       setSelectedComplaint(updatedComplaint)
       setNewComment("")
 
+      // Update the complaints list with the new comment
+      setComplaints(prev => 
+        prev.map(c => c._id === updatedComplaint._id ? updatedComplaint : c)
+      )
+
       toast({
         title: "Success",
         description: "Comment added successfully",
         duration: 3000,
       })
-
-      await fetchComplaints()
     } catch (error: any) {
       console.error("Error adding comment:", error)
       toast({
@@ -435,7 +478,7 @@ export default function ComplaintsManagementPage() {
                             <AvatarImage
                               src={
                                 complaint.submittedBy?.profilePicture ||
-                                `https://ui-avatars.com/api/?name=${getUsernameFromEmail(complaint.submittedBy?.email) || "/placeholder.svg"}&background=random`
+                                `https://ui-avatars.com/api/?name=${getUsernameFromEmail(complaint.submittedBy?.email) || "user"}&background=random`
                               }
                               alt={getUsernameFromEmail(complaint.submittedBy?.email)}
                             />
@@ -503,7 +546,14 @@ export default function ComplaintsManagementPage() {
         </Card>
 
         {/* Complaint Details Dialog */}
-        <Dialog open={!!selectedComplaint} onOpenChange={(open) => !open && setSelectedComplaint(null)}>
+        <Dialog 
+          open={!!selectedComplaint} 
+          onOpenChange={(open) => {
+            if (!open) {
+              handleDialogClose()
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto border border-purple-200 dark:border-purple-800/30 shadow-lg">
             {selectedComplaint && (
               <>
@@ -513,7 +563,7 @@ export default function ComplaintsManagementPage() {
                       <AvatarImage
                         src={
                           selectedComplaint.submittedBy?.profilePicture ||
-                          `https://ui-avatars.com/api/?name=${getUsernameFromEmail(selectedComplaint.submittedBy?.email) || "/placeholder.svg"}&background=random`
+                          `https://ui-avatars.com/api/?name=${getUsernameFromEmail(selectedComplaint.submittedBy?.email) || "user"}&background=random`
                         }
                         alt={getUsernameFromEmail(selectedComplaint.submittedBy?.email)}
                       />
@@ -652,7 +702,7 @@ export default function ComplaintsManagementPage() {
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
-                          onClick={() => setSelectedComplaint(null)}
+                          onClick={handleDialogClose}
                           className="border-purple-200 dark:border-purple-800/30 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                         >
                           Close

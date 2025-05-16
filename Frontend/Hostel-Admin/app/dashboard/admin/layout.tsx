@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Bell, LogOut, User, ChevronDown, Shield, Calendar, AlertCircle } from "lucide-react"
+import { Bell, LogOut, User, ChevronDown, Shield, Calendar, AlertCircle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -102,7 +102,7 @@ export default function AdminDashboardLayout({
       const token = localStorage.getItem("adminToken")
       if (!token) return
 
-      // Only fetch leaves and complaints
+      // Only fetch pending leaves and complaints
       const [leavesRes, complaintsRes] = await Promise.all([
         axios
           .get(`${API_BASE_URL}/admin/leave?status=pending`, {
@@ -121,57 +121,69 @@ export default function AdminDashboardLayout({
             console.error("Error fetching complaints:", error)
             return { data: { data: [] } }
           }),
-      ])
+    ])
 
-      // Helper function to safely extract data
-      const getData = (response: any) => {
-        return response?.data?.data || []
-      }
+    // Helper function to safely extract data
+    const getData = (response: any) => {
+      const data = response?.data?.data || response?.data || []
+      return Array.isArray(data) ? data : []
+    }
 
-      // Transform leaves data
-      const pendingLeaves = getData(leavesRes).map((leave: any) => ({
+    // Transform leaves data
+    const pendingLeaves: PendingItem[] = getData(leavesRes)
+      .filter((leave: any) => leave.status === "pending")
+      .map((leave: any): PendingItem => ({
         _id: leave._id,
         type: "leave",
-        status: leave.status || "pending",
+        status: "pending",
         title: `${leave.student?.name || "Student"} - Leave Request`,
-        student: leave.student || { name: "Unknown" },
+        student: leave.student || { name: "Unknown", studentId: "N/A" },
+        roomNumber: leave.student?.roomId || { roomNumber: "N/A" },
         createdAt: leave.createdAt || new Date().toISOString(),
       }))
 
-      // Transform complaints data
-      const pendingComplaints = getData(complaintsRes).map((complaint: any) => ({
+    // Transform complaints data
+    const pendingComplaints: PendingItem[] = getData(complaintsRes)
+      .filter((complaint: any) => complaint.status === "pending")
+      .map((complaint: any): PendingItem => ({
         _id: complaint._id,
         type: "complaint",
-        status: complaint.status || "pending",
-        title: `${complaint.student?.name || "Student"} - ${complaint.type || "Complaint"}`,
-        student: complaint.student || { name: "Unknown" },
+        status: "pending",
+        title: complaint.title || "Complaint",
+        student: {
+          name: complaint.submittedBy?.email?.split('@')[0] || "Unknown",
+          studentId: complaint.submittedBy?.studentId || "N/A"
+        },
+        roomNumber: { roomNumber: complaint.roomNumber || "N/A" },
         createdAt: complaint.createdAt || new Date().toISOString(),
       }))
 
-      // Combine and sort items
-      const allPendingItems = [
-        ...pendingLeaves,
-        ...pendingComplaints.filter((item: { status: string }) => item.status !== "resolved"),
-      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    // Combine and sort items by creation date (newest first)
+    const allPendingItems = [...pendingLeaves, ...pendingComplaints]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-      setPendingItems(allPendingItems)
-    } catch (error) {
-      console.error("Failed to fetch pending items:", error)
-      toast.error("Failed to load pending items. Please try again.")
-    }
+    setPendingItems(allPendingItems)
+  } catch (error) {
+    console.error("Failed to fetch pending items:", error)
+    toast.error("Failed to load pending items. Please try again.")
   }
+}
 
-  const handleNotificationClick = (item: PendingItem) => {
+const handleNotificationClick = (item: PendingItem) => {
+  setShowNotifications(false) // Close notifications first
+  
+  // Use setTimeout to ensure the UI updates before navigation
+  setTimeout(() => {
     switch (item.type) {
       case "leave":
-        router.push(`/dashboard/admin/leaves/${item._id}`)
+        router.push(`/dashboard/admin/leave?id=${item._id}`)
         break
       case "complaint":
-        router.push(`/dashboard/admin/complaints/${item._id}`)
+        router.push(`/dashboard/admin/complaints?id=${item._id}`)
         break
     }
-    setShowNotifications(false)
-  }
+  }, 100)
+}
 
   const handleActionComplete = () => {
     fetchPendingItems()
@@ -200,16 +212,25 @@ export default function AdminDashboardLayout({
       }
     }
 
+    // Function to handle escape key
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showNotifications) {
+        setShowNotifications(false)
+      }
+    }
+
     // Add event listeners if notifications are shown
     if (showNotifications) {
       document.addEventListener("mousedown", handleClickOutside)
       document.addEventListener("scroll", handleScroll, true)
+      document.addEventListener("keydown", handleEscKey)
     }
 
     // Clean up event listeners
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
       document.removeEventListener("scroll", handleScroll, true)
+      document.removeEventListener("keydown", handleEscKey)
     }
   }, [showNotifications])
 

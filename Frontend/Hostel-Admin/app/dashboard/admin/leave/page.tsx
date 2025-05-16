@@ -6,12 +6,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle, Filter, Search, XCircle, Loader2, CalendarDays, Home, Stethoscope, Clock, User, Phone, FileText, ChevronRight, MapPin, AlertCircle, Info } from 'lucide-react'
+import {
+  CheckCircle,
+  Filter,
+  Search,
+  XCircle,
+  Loader2,
+  CalendarDays,
+  Home,
+  Stethoscope,
+  Clock,
+  User,
+  Phone,
+  FileText,
+  MapPin,
+  AlertCircle,
+  Info,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 type Student = {
   _id: string
@@ -46,7 +63,7 @@ type LeaveApplication = {
   createdAt: string
 }
 
-export default function LeaveApprovalsPage() {
+export default function LeaveApprovalsPage({ onActionComplete }: { onActionComplete?: () => void }) {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending")
   const [searchTerm, setSearchTerm] = useState("")
@@ -55,7 +72,15 @@ export default function LeaveApprovalsPage() {
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([])
   const [filteredApplications, setFilteredApplications] = useState<LeaveApplication[]>([])
   const [selectedApplication, setSelectedApplication] = useState<LeaveApplication | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogLoading, setIsDialogLoading] = useState(false)
+  const [processingApplicationId, setProcessingApplicationId] = useState<string | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const leaveId = searchParams.get("id")
+
+  // Check if dialog should be open based on URL
+  const isDialogOpen = !!leaveId
 
   // Format date to display
   const formatDate = (dateString: string) => {
@@ -122,6 +147,17 @@ export default function LeaveApprovalsPage() {
 
         if (data.success) {
           setLeaveApplications(data.data)
+
+          // If there's a leaveId in the URL, find and set the selected application
+          if (leaveId) {
+            const application = data.data.find((app: LeaveApplication) => app._id === leaveId)
+            if (application) {
+              setSelectedApplication(application)
+            } else {
+              // If application not found, remove the ID from URL
+              router.replace(pathname, { scroll: false })
+            }
+          }
         } else {
           throw new Error(data.message || "Failed to fetch leave applications")
         }
@@ -137,7 +173,7 @@ export default function LeaveApprovalsPage() {
     }
 
     fetchLeaveApplications()
-  }, [toast])
+  }, [toast, leaveId, pathname, router])
 
   // Filter applications based on search term and status
   useEffect(() => {
@@ -165,15 +201,41 @@ export default function LeaveApprovalsPage() {
       activeTab === "pending"
         ? app.status === "pending"
         : activeTab === "approved"
-        ? app.status === "approved"
-        : app.status === "rejected",
+          ? app.status === "approved"
+          : app.status === "rejected",
     )
 
     setFilteredApplications(filtered)
   }, [searchTerm, statusFilter, leaveApplications, activeTab])
 
+  // Function to open application details
+  const openApplicationDetails = (application: LeaveApplication) => {
+    // Only update if it's a different application
+    if (!selectedApplication || selectedApplication._id !== application._id) {
+      setSelectedApplication(application)
+      router.push(`${pathname}?id=${application._id}`, { scroll: false })
+    }
+  }
+
+  // Function to close application details
+  const closeDialog = () => {
+    // Check if we're in the middle of processing
+    if (processingApplicationId) {
+      return // Don't close if we're processing
+    }
+
+    // Remove the query parameter first without triggering a full page reload
+    router.replace(pathname, { scroll: false })
+    // Then clear the selected application after a short delay
+    setTimeout(() => {
+      setSelectedApplication(null)
+    }, 100)
+  }
+
   const handleStatusUpdate = async (id: string, status: "approved" | "rejected", remarks = "") => {
-    setIsLoading(true)
+    // Set the processing application ID to show loading only for that specific button
+    setProcessingApplicationId(id)
+
     try {
       const token = localStorage.getItem("adminToken")
 
@@ -199,6 +261,14 @@ export default function LeaveApprovalsPage() {
         title: "Success",
         description: `Leave application ${status}`,
       })
+
+      // Notify parent component that an action was completed
+      if (onActionComplete) {
+        onActionComplete()
+      }
+
+      // Close the dialog after successful update
+      closeDialog()
     } catch (error) {
       toast({
         title: "Error",
@@ -206,13 +276,8 @@ export default function LeaveApprovalsPage() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setProcessingApplicationId(null)
     }
-  }
-
-  const openApplicationDetails = (application: LeaveApplication) => {
-    setSelectedApplication(application)
-    setIsDialogOpen(true)
   }
 
   return (
@@ -370,7 +435,10 @@ export default function LeaveApprovalsPage() {
                             <TableCell>
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9 border border-amber-200 dark:border-amber-800/30">
-                                  <AvatarImage src={leave.student.userId.profilePicture || "/placeholder.svg"} alt={leave.student.name} />
+                                  <AvatarImage
+                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
+                                    alt={leave.student.name}
+                                  />
                                   <AvatarFallback className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                                     {leave.student.name.charAt(0)}
                                   </AvatarFallback>
@@ -423,9 +491,13 @@ export default function LeaveApprovalsPage() {
                                     e.stopPropagation()
                                     handleStatusUpdate(leave._id, "approved")
                                   }}
-                                  disabled={isLoading}
+                                  disabled={processingApplicationId === leave._id}
                                 >
-                                  <CheckCircle className="mr-1 h-3 w-3" />
+                                  {processingApplicationId === leave._id ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                  )}
                                   Approve
                                 </Button>
                                 <Button
@@ -436,9 +508,13 @@ export default function LeaveApprovalsPage() {
                                     e.stopPropagation()
                                     handleStatusUpdate(leave._id, "rejected")
                                   }}
-                                  disabled={isLoading}
+                                  disabled={processingApplicationId === leave._id}
                                 >
-                                  <XCircle className="mr-1 h-3 w-3" />
+                                  {processingApplicationId === leave._id ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <XCircle className="mr-1 h-3 w-3" />
+                                  )}
                                   Reject
                                 </Button>
                               </div>
@@ -518,7 +594,10 @@ export default function LeaveApprovalsPage() {
                             <TableCell>
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9 border border-emerald-200 dark:border-emerald-800/30">
-                                  <AvatarImage src={leave.student.userId.profilePicture || "/placeholder.svg"} alt={leave.student.name} />
+                                  <AvatarImage
+                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
+                                    alt={leave.student.name}
+                                  />
                                   <AvatarFallback className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
                                     {leave.student.name.charAt(0)}
                                   </AvatarFallback>
@@ -638,7 +717,10 @@ export default function LeaveApprovalsPage() {
                             <TableCell>
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9 border border-red-200 dark:border-red-800/30">
-                                  <AvatarImage src={leave.student.userId.profilePicture || "/placeholder.svg"} alt={leave.student.name} />
+                                  <AvatarImage
+                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
+                                    alt={leave.student.name}
+                                  />
                                   <AvatarFallback className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                                     {leave.student.name.charAt(0)}
                                   </AvatarFallback>
@@ -695,9 +777,19 @@ export default function LeaveApprovalsPage() {
         </Tabs>
 
         {/* Application Details Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (!open && !processingApplicationId) {
+              closeDialog()
+            } else if (!open && processingApplicationId) {
+              // Prevent dialog from closing during operations
+              return false
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto border-purple-200 dark:border-purple-800/30">
-            {selectedApplication && (
+            {selectedApplication ? (
               <>
                 <DialogHeader className="border-b border-purple-100 dark:border-purple-800/20 pb-4">
                   <div className="flex items-center gap-4">
@@ -844,11 +936,14 @@ export default function LeaveApprovalsPage() {
                             className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20"
                             onClick={() => {
                               handleStatusUpdate(selectedApplication._id, "approved")
-                              setIsDialogOpen(false)
                             }}
-                            disabled={isLoading}
+                            disabled={processingApplicationId === selectedApplication._id}
                           >
-                            <CheckCircle className="mr-1 h-4 w-4" />
+                            {processingApplicationId === selectedApplication._id ? (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                            )}
                             Approve
                           </Button>
                           <Button
@@ -856,11 +951,14 @@ export default function LeaveApprovalsPage() {
                             className="border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
                             onClick={() => {
                               handleStatusUpdate(selectedApplication._id, "rejected")
-                              setIsDialogOpen(false)
                             }}
-                            disabled={isLoading}
+                            disabled={processingApplicationId === selectedApplication._id}
                           >
-                            <XCircle className="mr-1 h-4 w-4" />
+                            {processingApplicationId === selectedApplication._id ? (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="mr-1 h-4 w-4" />
+                            )}
                             Reject
                           </Button>
                         </div>
@@ -894,6 +992,10 @@ export default function LeaveApprovalsPage() {
                   </div>
                 </div>
               </>
+            ) : (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+              </div>
             )}
           </DialogContent>
         </Dialog>
