@@ -22,6 +22,11 @@ import {
   MapPin,
   AlertCircle,
   Info,
+  Hash,
+  Building,
+  Layers,
+  BookOpen,
+  Mail,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -29,6 +34,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { Separator } from "@/components/ui/separator"
 
 type Student = {
   _id: string
@@ -37,9 +43,16 @@ type Student = {
     profilePicture?: string
   }
   name: string
+  studentId: string
+  email?: string
+  phone?: string
+  course?: string
+  year?: string
   roomId?: {
+    _id: string
     roomNumber: string
     block: string
+    floor?: string
   }
 }
 
@@ -129,6 +142,44 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
     }
   }
 
+  // Get color theme based on tab
+  const getTabTheme = (tab: string) => {
+    switch (tab) {
+      case "pending":
+        return {
+          border: "border-amber-200 dark:border-amber-800/30",
+          bg: "bg-amber-50 dark:bg-amber-900/20",
+          text: "text-amber-800 dark:text-amber-200",
+          icon: "text-amber-600",
+          hover: "hover:bg-amber-50 dark:hover:bg-amber-900/10",
+        }
+      case "approved":
+        return {
+          border: "border-emerald-200 dark:border-emerald-800/30",
+          bg: "bg-emerald-50 dark:bg-emerald-900/20",
+          text: "text-emerald-800 dark:text-emerald-200",
+          icon: "text-emerald-600",
+          hover: "hover:bg-emerald-50 dark:hover:bg-emerald-900/10",
+        }
+      case "rejected":
+        return {
+          border: "border-red-200 dark:border-red-800/30",
+          bg: "bg-red-50 dark:bg-red-900/20",
+          text: "text-red-800 dark:text-red-200",
+          icon: "text-red-600",
+          hover: "hover:bg-red-50 dark:hover:bg-red-900/10",
+        }
+      default:
+        return {
+          border: "border-amber-200 dark:border-amber-800/30",
+          bg: "bg-amber-50 dark:bg-amber-900/20",
+          text: "text-amber-800 dark:text-amber-200",
+          icon: "text-amber-600",
+          hover: "hover:bg-amber-50 dark:hover:bg-amber-900/10",
+        }
+    }
+  }
+
   // Fetch leave applications from API
   useEffect(() => {
     const fetchLeaveApplications = async () => {
@@ -189,10 +240,13 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter((app) => {
         const studentName = app.student.name?.toLowerCase() || ""
+        const studentId = app.student.studentId?.toLowerCase() || ""
         const roomNumber = app.student.roomId?.roomNumber?.toLowerCase() || ""
         const reason = app.reason?.toLowerCase() || ""
 
-        return studentName.includes(term) || roomNumber.includes(term) || reason.includes(term)
+        return (
+          studentName.includes(term) || studentId.includes(term) || roomNumber.includes(term) || reason.includes(term)
+        )
       })
     }
 
@@ -280,6 +334,106 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
     }
   }
 
+  // Render table row for an application
+  const renderApplicationRow = (leave: LeaveApplication, theme: any) => (
+    <TableRow
+      key={leave._id}
+      className={`cursor-pointer ${theme.hover} border-b ${theme.border}`}
+      onClick={() => openApplicationDetails(leave)}
+    >
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Avatar className={`h-9 w-9 border ${theme.border}`}>
+            <AvatarImage src={leave.student.userId.profilePicture || "/placeholder.svg"} alt={leave.student.name} />
+            <AvatarFallback className={`${theme.bg} ${theme.text}`}>{leave.student.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-medium">{leave.student.name}</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge
+          variant="outline"
+          className={`${theme.border} ${theme.bg} flex items-center gap-1 text-base font-medium`}
+        >
+          <Hash className={`h-4 w-4 ${theme.icon}`} />
+          {leave.student.studentId}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {getLeaveTypeIcon(leave.leaveType)}
+          <span className="capitalize">{leave.leaveType}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col">
+          <span>{formatDate(leave.startDate)}</span>
+          <span className="text-xs text-muted-foreground">to {formatDate(leave.endDate)}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="secondary" className={`${theme.bg} ${theme.text}`}>
+          {calculateDuration(leave.startDate, leave.endDate)}
+        </Badge>
+      </TableCell>
+      <TableCell className="max-w-[200px] truncate">{leave.reason}</TableCell>
+      {activeTab === "pending" && (
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 border-emerald-600 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleStatusUpdate(leave._id, "approved")
+              }}
+              disabled={processingApplicationId === leave._id}
+            >
+              {processingApplicationId === leave._id ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <CheckCircle className="mr-1 h-3 w-3" />
+              )}
+              Approve
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleStatusUpdate(leave._id, "rejected")
+              }}
+              disabled={processingApplicationId === leave._id}
+            >
+              {processingApplicationId === leave._id ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <XCircle className="mr-1 h-3 w-3" />
+              )}
+              Reject
+            </Button>
+          </div>
+        </TableCell>
+      )}
+      {activeTab === "approved" && (
+        <>
+          <TableCell>{leave.approvedBy?.name || "System"}</TableCell>
+          <TableCell>{leave.approvalDate ? formatDate(leave.approvalDate) : "N/A"}</TableCell>
+        </>
+      )}
+      {activeTab === "rejected" && (
+        <>
+          <TableCell className="max-w-[200px] truncate">{leave.remarks || "N/A"}</TableCell>
+          <TableCell>{leave.approvalDate ? formatDate(leave.approvalDate) : "N/A"}</TableCell>
+        </>
+      )}
+    </TableRow>
+  )
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex flex-col gap-6">
@@ -296,7 +450,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-500" />
             <Input
               type="search"
-              placeholder="Search by name, room, or reason..."
+              placeholder="Search by name, ID, room, or reason..."
               className="w-full pl-10 border-purple-200 dark:border-purple-800/30 focus-visible:ring-purple-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -417,8 +571,8 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                       <TableHeader className="bg-amber-50 dark:bg-amber-900/20">
                         <TableRow className="border-b border-amber-200 dark:border-amber-800/30">
                           <TableHead className="w-[200px]">Student</TableHead>
+                          <TableHead>Student ID</TableHead>
                           <TableHead>Leave Type</TableHead>
-                          <TableHead>Room</TableHead>
                           <TableHead>Dates</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead>Reason</TableHead>
@@ -426,101 +580,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredApplications.map((leave) => (
-                          <TableRow
-                            key={leave._id}
-                            className="cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 border-b border-amber-200 dark:border-amber-800/30"
-                            onClick={() => openApplicationDetails(leave)}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-9 w-9 border border-amber-200 dark:border-amber-800/30">
-                                  <AvatarImage
-                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
-                                    alt={leave.student.name}
-                                  />
-                                  <AvatarFallback className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                                    {leave.student.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium">{leave.student.name}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {getLeaveTypeIcon(leave.leaveType)}
-                                <span className="capitalize">{leave.leaveType}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {leave.student.roomId ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/20"
-                                >
-                                  {leave.student.roomId.block}-{leave.student.roomId.roomNumber}
-                                </Badge>
-                              ) : (
-                                "N/A"
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span>{formatDate(leave.startDate)}</span>
-                                <span className="text-xs text-muted-foreground">to {formatDate(leave.endDate)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                              >
-                                {calculateDuration(leave.startDate, leave.endDate)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate">{leave.reason}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 border-emerald-600 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleStatusUpdate(leave._id, "approved")
-                                  }}
-                                  disabled={processingApplicationId === leave._id}
-                                >
-                                  {processingApplicationId === leave._id ? (
-                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                  )}
-                                  Approve
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleStatusUpdate(leave._id, "rejected")
-                                  }}
-                                  disabled={processingApplicationId === leave._id}
-                                >
-                                  {processingApplicationId === leave._id ? (
-                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <XCircle className="mr-1 h-3 w-3" />
-                                  )}
-                                  Reject
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredApplications.map((leave) => renderApplicationRow(leave, getTabTheme("pending")))}
                       </TableBody>
                     </Table>
                   </div>
@@ -575,8 +635,8 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                       <TableHeader className="bg-emerald-50 dark:bg-emerald-900/20">
                         <TableRow className="border-b border-emerald-200 dark:border-emerald-800/30">
                           <TableHead className="w-[200px]">Student</TableHead>
+                          <TableHead>Student ID</TableHead>
                           <TableHead>Leave Type</TableHead>
-                          <TableHead>Room</TableHead>
                           <TableHead>Dates</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead>Reason</TableHead>
@@ -585,65 +645,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredApplications.map((leave) => (
-                          <TableRow
-                            key={leave._id}
-                            className="cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/10 border-b border-emerald-200 dark:border-emerald-800/30"
-                            onClick={() => openApplicationDetails(leave)}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-9 w-9 border border-emerald-200 dark:border-emerald-800/30">
-                                  <AvatarImage
-                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
-                                    alt={leave.student.name}
-                                  />
-                                  <AvatarFallback className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                                    {leave.student.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium">{leave.student.name}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {getLeaveTypeIcon(leave.leaveType)}
-                                <span className="capitalize">{leave.leaveType}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {leave.student.roomId ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-emerald-200 dark:border-emerald-800/30 bg-emerald-50 dark:bg-emerald-900/20"
-                                >
-                                  {leave.student.roomId.block}-{leave.student.roomId.roomNumber}
-                                </Badge>
-                              ) : (
-                                "N/A"
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span>{formatDate(leave.startDate)}</span>
-                                <span className="text-xs text-muted-foreground">to {formatDate(leave.endDate)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                              >
-                                {calculateDuration(leave.startDate, leave.endDate)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate">{leave.reason}</TableCell>
-                            <TableCell>{leave.approvedBy?.name || "System"}</TableCell>
-                            <TableCell>{leave.approvalDate ? formatDate(leave.approvalDate) : "N/A"}</TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredApplications.map((leave) => renderApplicationRow(leave, getTabTheme("approved")))}
                       </TableBody>
                     </Table>
                   </div>
@@ -698,8 +700,8 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                       <TableHeader className="bg-red-50 dark:bg-red-900/20">
                         <TableRow className="border-b border-red-200 dark:border-red-800/30">
                           <TableHead className="w-[200px]">Student</TableHead>
+                          <TableHead>Student ID</TableHead>
                           <TableHead>Leave Type</TableHead>
-                          <TableHead>Room</TableHead>
                           <TableHead>Dates</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead>Reason</TableHead>
@@ -708,65 +710,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredApplications.map((leave) => (
-                          <TableRow
-                            key={leave._id}
-                            className="cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 border-b border-red-200 dark:border-red-800/30"
-                            onClick={() => openApplicationDetails(leave)}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-9 w-9 border border-red-200 dark:border-red-800/30">
-                                  <AvatarImage
-                                    src={leave.student.userId.profilePicture || "/placeholder.svg"}
-                                    alt={leave.student.name}
-                                  />
-                                  <AvatarFallback className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                    {leave.student.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium">{leave.student.name}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {getLeaveTypeIcon(leave.leaveType)}
-                                <span className="capitalize">{leave.leaveType}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {leave.student.roomId ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-red-200 dark:border-red-800/30 bg-red-50 dark:bg-red-900/20"
-                                >
-                                  {leave.student.roomId.block}-{leave.student.roomId.roomNumber}
-                                </Badge>
-                              ) : (
-                                "N/A"
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span>{formatDate(leave.startDate)}</span>
-                                <span className="text-xs text-muted-foreground">to {formatDate(leave.endDate)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-                              >
-                                {calculateDuration(leave.startDate, leave.endDate)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate">{leave.reason}</TableCell>
-                            <TableCell className="max-w-[200px] truncate">{leave.remarks || "N/A"}</TableCell>
-                            <TableCell>{leave.approvalDate ? formatDate(leave.approvalDate) : "N/A"}</TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredApplications.map((leave) => renderApplicationRow(leave, getTabTheme("rejected")))}
                       </TableBody>
                     </Table>
                   </div>
@@ -800,23 +744,121 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <DialogTitle className="text-xl text-purple-900 dark:text-purple-100">
+                      <DialogTitle className="text-xl text-purple-900 dark:text-purple-100 flex items-center gap-2">
                         {selectedApplication.student.name}
+                        <Badge
+                          variant="outline"
+                          className="ml-2 text-xs border-purple-200 dark:border-purple-800/30 bg-purple-50 dark:bg-purple-900/20"
+                        >
+                          {getStatusBadge(selectedApplication.status)}
+                        </Badge>
                       </DialogTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        {selectedApplication.student.roomId && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-purple-200 dark:border-purple-800/30 bg-purple-50 dark:bg-purple-900/20"
-                          >
-                            {selectedApplication.student.roomId.block}-{selectedApplication.student.roomId.roomNumber}
-                          </Badge>
-                        )}
-                        {getStatusBadge(selectedApplication.status)}
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge
+                          variant="outline"
+                          className="text-sm border-purple-200 dark:border-purple-800/30 bg-purple-50 dark:bg-purple-900/20 flex items-center gap-1 font-medium"
+                        >
+                          <Hash className="h-4 w-4 text-purple-600" />
+                          Student ID: {selectedApplication.student.studentId}
+                        </Badge>
                       </div>
                     </div>
                   </div>
                 </DialogHeader>
+
+                {/* Student Information Card */}
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800/30 mt-4">
+                  <h3 className="font-medium flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                    <User className="h-5 w-5" />
+                    Student Information
+                  </h3>
+                  <Separator className="my-3 bg-indigo-200 dark:bg-indigo-800/50" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-5 w-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Student ID</p>
+                          <p className="font-medium text-lg">{selectedApplication.student.studentId}</p>
+                        </div>
+                      </div>
+
+                      {selectedApplication.student.course && (
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-indigo-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Course</p>
+                            <p className="font-medium">
+                              {selectedApplication.student.course}
+                              {selectedApplication.student.year && ` - Year ${selectedApplication.student.year}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {selectedApplication.student.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-indigo-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Email</p>
+                            <p className="font-medium">{selectedApplication.student.email}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedApplication.student.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-indigo-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Phone</p>
+                            <p className="font-medium">{selectedApplication.student.phone}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Room Information */}
+                  {selectedApplication.student.roomId && (
+                    <div className="mt-4 bg-white dark:bg-gray-900 p-4 rounded-md border border-indigo-100 dark:border-indigo-800/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Home className="h-5 w-5 text-indigo-600" />
+                        <h4 className="font-medium text-indigo-700 dark:text-indigo-300">Room Details</h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-7">
+                        <div className="flex flex-col">
+                          <span className="text-sm text-muted-foreground">Room Number</span>
+                          <span className="font-medium flex items-center gap-1">
+                            <Home className="h-3.5 w-3.5 text-indigo-600" />
+                            {selectedApplication.student.roomId.roomNumber}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <span className="text-sm text-muted-foreground">Block</span>
+                          <span className="font-medium flex items-center gap-1">
+                            <Building className="h-3.5 w-3.5 text-indigo-600" />
+                            {selectedApplication.student.roomId.block}
+                          </span>
+                        </div>
+
+                        {selectedApplication.student.roomId.floor && (
+                          <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">Floor</span>
+                            <span className="font-medium flex items-center gap-1">
+                              <Layers className="h-3.5 w-3.5 text-indigo-600" />
+                              {selectedApplication.student.roomId.floor}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                   <div className="space-y-4">
@@ -825,6 +867,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         <CalendarDays className="h-5 w-5" />
                         Leave Details
                       </h3>
+                      <Separator className="my-3 bg-purple-200 dark:bg-purple-800/50" />
                       <div className="mt-3 space-y-3 pl-7">
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Type:</span>
@@ -859,6 +902,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         <MapPin className="h-5 w-5" />
                         Destination
                       </h3>
+                      <Separator className="my-3 bg-emerald-200 dark:bg-emerald-800/50" />
                       <div className="mt-3 space-y-3 pl-7">
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Going to:</span>
@@ -887,9 +931,10 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                   <div className="space-y-4">
                     <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800/30">
                       <h3 className="font-medium flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                        <User className="h-5 w-5" />
+                        <Phone className="h-5 w-5" />
                         Contact Information
                       </h3>
+                      <Separator className="my-3 bg-purple-200 dark:bg-purple-800/50" />
                       <div className="mt-3 space-y-3 pl-7">
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Contact During Leave:</span>
@@ -906,6 +951,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                         <FileText className="h-5 w-5" />
                         Reason & Remarks
                       </h3>
+                      <Separator className="my-3 bg-purple-200 dark:bg-purple-800/50" />
                       <div className="mt-3 space-y-4 pl-7">
                         <div>
                           <p className="text-sm text-muted-foreground mb-1">Reason:</p>
@@ -930,6 +976,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                           <AlertCircle className="h-5 w-5" />
                           Pending Action
                         </h3>
+                        <Separator className="my-3 bg-amber-200 dark:bg-amber-800/50" />
                         <div className="mt-3 flex justify-end gap-2">
                           <Button
                             variant="outline"
@@ -971,6 +1018,7 @@ export default function LeaveApprovalsPage({ onActionComplete }: { onActionCompl
                           <Info className="h-5 w-5" />
                           Decision Information
                         </h3>
+                        <Separator className="my-3 bg-purple-200 dark:bg-purple-800/50" />
                         <div className="mt-3 space-y-3 pl-7">
                           <div className="flex justify-between">
                             <span className="text-sm text-muted-foreground">

@@ -1,10 +1,22 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 import { Sidebar } from "@/components/sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Bell, User, LogOut, GraduationCap, ChevronDown } from 'lucide-react'
+import {
+  Bell,
+  User,
+  LogOut,
+  GraduationCap,
+  ChevronDown,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Calendar,
+  MessageSquare,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -41,6 +53,19 @@ interface StudentProfile {
   updatedAt: string
 }
 
+interface Notification {
+  id: string
+  type: "leave" | "complaint" | "notice" | "attendance"
+  title: string
+  message: string
+  read: boolean
+  link: string
+  entityId: string
+  createdAt: string
+}
+
+const NOTIFICATION_STORAGE_KEY = "student_notifications"
+
 export default function StudentDashboardLayout({
   children,
 }: {
@@ -49,8 +74,77 @@ export default function StudentDashboardLayout({
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [notificationCount, setNotificationCount] = useState(0)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
+
+  // Load notifications from localStorage on initial render
+  useEffect(() => {
+    const savedNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY)
+    if (savedNotifications) {
+      const parsed = JSON.parse(savedNotifications)
+      setNotifications(parsed)
+      setNotificationCount(parsed.filter((n: Notification) => !n.read).length)
+    } else {
+      // Initialize with mock data if no saved notifications
+      initializeMockNotifications()
+    }
+  }, [])
+
+  // Save notifications to localStorage whenever they change
+  useEffect(() => {
+    if (notifications.length > 0) {
+      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications))
+    }
+  }, [notifications])
+
+  const initializeMockNotifications = () => {
+    const mockNotifications: Notification[] = [
+      {
+        id: "1",
+        type: "leave",
+        title: "Leave Request Approved",
+        message: "Your leave request for home visit has been approved",
+        read: false,
+        link: "/dashboard/student/leave",
+        entityId: "682792223b1ede91426bc71b",
+        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      },
+      {
+        id: "2",
+        type: "complaint",
+        title: "Complaint Resolved",
+        message: "Your maintenance complaint about room lighting has been resolved",
+        read: false,
+        link: "/dashboard/student/complaints",
+        entityId: "582792223b1ede91426bc72c",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      },
+      {
+        id: "3",
+        type: "notice",
+        title: "New Notice Posted",
+        message: "Important notice regarding upcoming hostel maintenance",
+        read: false,
+        link: "/dashboard/student/notices",
+        entityId: "782792223b1ede91426bc73d",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+      },
+      {
+        id: "4",
+        type: "attendance",
+        title: "Attendance Marked",
+        message: "Your attendance has been marked for today",
+        read: true,
+        link: "/dashboard/student/attendance",
+        entityId: "882792223b1ede91426bc74e",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      },
+    ]
+    setNotifications(mockNotifications)
+    setNotificationCount(mockNotifications.filter(n => !n.read).length)
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,40 +154,16 @@ export default function StudentDashboardLayout({
           throw new Error("No authentication token found")
         }
 
-        // First fetch profile data
-        const profileResponse = await axios.get(
-          "http://localhost:5000/api/student/profile",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        )
+        const profileResponse = await axios.get("http://localhost:5000/api/student/profile", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
 
         if (profileResponse.data?.success) {
           setProfile(profileResponse.data.data)
         }
-
-        // Then try to fetch notifications (handle potential 404)
-        try {
-          const notificationsResponse = await axios.get(
-            "http://localhost:5000/api/student/notifications/count",
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          )
-          if (notificationsResponse.data?.success) {
-            setNotificationCount(notificationsResponse.data.count)
-          }
-        } catch (notifError) {
-          console.log("Notifications endpoint not available, using default count")
-          setNotificationCount(0) // Default value if endpoint not found
-        }
-
       } catch (error: any) {
         console.error("Error fetching data:", error)
         if (error.response?.status === 401) {
@@ -107,10 +177,7 @@ export default function StudentDashboardLayout({
         } else {
           toast({
             title: "Error",
-            description:
-              error.response?.data?.message ||
-              error.message ||
-              "Failed to load profile data",
+            description: error.response?.data?.message || error.message || "Failed to load profile data",
             variant: "destructive",
           })
         }
@@ -131,6 +198,95 @@ export default function StudentDashboardLayout({
     })
   }
 
+  // Mark all notifications as read when dropdown is opened
+  const handleDropdownOpen = (open: boolean) => {
+    setDropdownOpen(open)
+    if (open) {
+      markAllAsRead()
+    }
+  }
+
+  const markAllAsRead = () => {
+    const updated = notifications.map(n => ({ ...n, read: true }))
+    setNotifications(updated)
+    setNotificationCount(0)
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated))
+  }
+
+  const markAsRead = async (notificationId: string) => {
+    const updated = notifications.map(n => 
+      n.id === notificationId ? { ...n, read: true } : n
+    )
+    setNotifications(updated)
+    setNotificationCount(prev => Math.max(0, prev - 1))
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated))
+  }
+
+  const deleteNotification = (notificationId: string) => {
+    const updated = notifications.filter(n => n.id !== notificationId)
+    setNotifications(updated)
+    
+    // Update count if the deleted notification was unread
+    const deletedNotification = notifications.find(n => n.id === notificationId)
+    if (deletedNotification && !deletedNotification.read) {
+      setNotificationCount(prev => Math.max(0, prev - 1))
+    }
+    
+    // Update localStorage
+    if (updated.length === 0) {
+      localStorage.removeItem(NOTIFICATION_STORAGE_KEY)
+    } else {
+      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated))
+    }
+
+    toast({
+      title: "Notification deleted",
+      variant: "default",
+    })
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.read) {
+      markAsRead(notification.id)
+    }
+    const url = `${notification.link}?id=${notification.entityId}`
+    router.push(url)
+  }
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "leave":
+        return <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+      case "complaint":
+        return <MessageSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+      case "notice":
+        return <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+      case "attendance":
+        return <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+      default:
+        return <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+    }
+  }
+
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffMins < 60) {
+      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`
+    } else {
+      return date.toLocaleDateString()
+    }
+  }
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -142,11 +298,7 @@ export default function StudentDashboardLayout({
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <Head>
-        <title>
-          {profile
-            ? `${profile.name} | Student Portal`
-            : "Student Portal | Hostel Management System"}
-        </title>
+        <title>{profile ? `${profile.name} | Student Portal` : "Student Portal | Hostel Management System"}</title>
         <meta name="description" content="Student dashboard for hostel residents" />
       </Head>
 
@@ -164,17 +316,94 @@ export default function StudentDashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               <ModeToggle />
-              <Button variant="outline" size="icon" className="relative border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
-                <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                {notificationCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 dark:bg-indigo-500 text-[10px] text-white p-0 min-w-0">
-                    {notificationCount}
-                  </Badge>
-                )}
-              </Button>
+              <DropdownMenu onOpenChange={handleDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="relative border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                  >
+                    <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    {notificationCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 dark:bg-indigo-500 text-[10px] text-white p-0 min-w-0">
+                        {notificationCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-80" align="end">
+                  <DropdownMenuLabel className="flex items-center justify-between">
+                    <span>Notifications</span>
+                    {notificationCount > 0 && !dropdownOpen && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          markAllAsRead()
+                        }}
+                      >
+                        Mark all as read
+                      </Button>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {loading ? (
+                    <div className="p-4 text-center">
+                      <Skeleton className="h-5 w-full mb-2" />
+                      <Skeleton className="h-5 w-full mb-2" />
+                      <Skeleton className="h-5 w-full" />
+                    </div>
+                  ) : notifications.length > 0 ? (
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div key={notification.id} className="relative group">
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-start gap-2 p-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 pr-8"
+                            onClick={() => handleNotificationClick(notification)}
+                          >
+                            {getNotificationIcon(notification.type)}
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium">{notification.title}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{notification.message}</p>
+                              <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                                {formatNotificationTime(notification.createdAt)}
+                              </p>
+                            </div>
+                            {!notification.read && !dropdownOpen && (
+                              <div className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 mt-1"></div>
+                            )}
+                          </DropdownMenuItem>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteNotification(notification.id)
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
+                            aria-label="Delete notification"
+                          >
+                            <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30 mb-2">
+                        <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No notifications</p>
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative flex items-center gap-2 rounded-full px-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
+                  <Button
+                    variant="ghost"
+                    className="relative flex items-center gap-2 rounded-full px-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                  >
                     {loading ? (
                       <Skeleton className="h-8 w-8 rounded-full" />
                     ) : (
@@ -186,11 +415,7 @@ export default function StudentDashboardLayout({
                       </Avatar>
                     )}
                     <span className="hidden md:inline text-sm font-medium">
-                      {loading ? (
-                        <Skeleton className="h-4 w-20" />
-                      ) : (
-                        profile?.name || "Student"
-                      )}
+                      {loading ? <Skeleton className="h-4 w-20" /> : profile?.name || "Student"}
                     </span>
                     <ChevronDown className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   </Button>
@@ -214,12 +439,8 @@ export default function StudentDashboardLayout({
                     <>
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium">
-                            {profile?.name || "Student Name"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {profile?.email || "student@example.com"}
-                          </p>
+                          <p className="text-sm font-medium">{profile?.name || "Student Name"}</p>
+                          <p className="text-xs text-muted-foreground">{profile?.email || "student@example.com"}</p>
                           {profile?.course && profile?.year && (
                             <p className="text-xs text-muted-foreground">
                               {profile.course}, {profile.year}

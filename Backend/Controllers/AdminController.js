@@ -790,7 +790,6 @@ export const updateComplaintByAdmin = async (req, res, next) => {
 };
 
 
-
 // Get all leave applications (admin version)
 export const getLeaveApplications = async (req, res, next) => {
   try {
@@ -802,14 +801,14 @@ export const getLeaveApplications = async (req, res, next) => {
       });
     }
 
-    // Get all leave applications
+    // Get all leave applications with complete student details
     const leaves = await Leave.find()
       .populate({
         path: "student",
-        select: "name rollNumber",
+        select: "_id name rollNumber roomNumber studentId", // Include roomNumber here
         populate: {
           path: "userId",
-          select: "username profilePicture",
+          select: "_id username profilePicture fullName",
         },
       })
       .populate({
@@ -859,8 +858,16 @@ export const updateLeaveStatus = async (req, res, next) => {
 
     await leave.save();
 
-    // Populate the approvedBy field for response
+    // Populate all necessary fields for response
     const updatedLeave = await Leave.findById(leave._id)
+      .populate({
+        path: "student",
+        select: "_id name rollNumber roomNumber studentId", // Include roomNumber here
+        populate: {
+          path: "userId",
+          select: "_id username profilePicture fullName",
+        },
+      })
       .populate({
         path: "approvedBy",
         select: "name role",
@@ -874,4 +881,3 @@ export const updateLeaveStatus = async (req, res, next) => {
     next(error);
   }
 };
-

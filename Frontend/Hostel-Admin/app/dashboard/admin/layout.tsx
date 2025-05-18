@@ -318,7 +318,7 @@ const handleNotificationClick = (item: PendingItem) => {
                               <div className="flex-1">
                                 <h4 className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</h4>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {item.roomNumber?.roomNumber || "N/A"} • {new Date(item.createdAt).toLocaleString()}
+                                  {item.student?.studentId || "N/A"} • {new Date(item.createdAt).toLocaleString()}
                                 </p>
                                 <div className="mt-2">
                                   <Badge variant="outline" className="text-xs capitalize">
